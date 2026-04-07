@@ -193,6 +193,17 @@ func SetApiRouter(router *gin.Engine) {
 			timeDynamicRatioRoute.PUT("/", controller.UpdateTimeDynamicRatio)
 		}
 
+		// 并发限制管理路由（管理员可操作）
+		concurrencyRoute := apiRouter.Group("/concurrency")
+		concurrencyRoute.Use(middleware.AdminAuth())
+		{
+			concurrencyRoute.GET("/setting", controller.GetConcurrencySetting)
+			concurrencyRoute.PUT("/setting", controller.UpdateConcurrencySetting)
+			concurrencyRoute.GET("/override", controller.GetConcurrencyOverrides)
+			concurrencyRoute.PUT("/override/:userId", controller.SetConcurrencyOverride)
+			concurrencyRoute.DELETE("/override/:userId", controller.DeleteConcurrencyOverride)
+		}
+
 		// Custom OAuth provider management (root only)
 		customOAuthRoute := apiRouter.Group("/custom-oauth-provider")
 		customOAuthRoute.Use(middleware.RootAuth())
