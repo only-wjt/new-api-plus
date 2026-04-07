@@ -52,8 +52,9 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	groupRatioInfo := HandleGroupRatio(c, info)
 
 	// 计算时间动态倍率（独立于 GroupRatio，不修改原有倍率）
+	// 使用 TokenGroup（token 绑定的分组）匹配规则，而非 UserGroup（用户基础分组）
 	tdMultiplier := operation_setting.ResolveTimeDynamicMultiplier(
-		info.OriginModelName, info.UserGroup, time.Now(),
+		info.OriginModelName, info.TokenGroup, time.Now(),
 	)
 
 	var preConsumedQuota int
@@ -150,9 +151,9 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
 	groupRatioInfo := HandleGroupRatio(c, info)
 
-	// 计算时间动态倍率
+	// 计算时间动态倍率（使用 TokenGroup 匹配规则）
 	tdMultiplier := operation_setting.ResolveTimeDynamicMultiplier(
-		info.OriginModelName, info.UserGroup, time.Now(),
+		info.OriginModelName, info.TokenGroup, time.Now(),
 	)
 
 	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
