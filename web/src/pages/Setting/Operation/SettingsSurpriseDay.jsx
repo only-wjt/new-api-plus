@@ -343,22 +343,30 @@ export default function SettingsSurpriseDay(props) {
                     {t('排除的用户')}
                   </Typography.Text>
                   <Select
-                    multiple filter allowCreate style={{ width: '100%' }}
-                    placeholder={t('搜索并选择要排除的用户，也可手动输入用户 ID')}
+                    multiple filter style={{ width: '100%' }}
+                    placeholder={t('搜索并选择要排除的用户')}
                     value={excludeIds} disabled={!isEnabled}
                     onChange={(values) => {
-                      // 确保值都是数字
-                      const numValues = values.map(v => typeof v === 'string' ? parseInt(v, 10) : v).filter(n => !isNaN(n) && n > 0);
-                      setExcludeIds(numValues);
-                      const str = serializeExcludeIds(numValues);
+                      setExcludeIds(values);
+                      const str = serializeExcludeIds(values);
                       setInputs((prev) => ({ ...prev, 'surprise_day_setting.exclude_user_ids': str }));
                     }}
                   >
-                    {userList.map((user) => (
-                      <Select.Option key={user.id} value={user.id}>
-                        {user.username} (ID: {user.id}){user.role >= 100 ? ' 👑管理员' : ''}
-                      </Select.Option>
-                    ))}
+                    {(() => {
+                      // 合并用户列表和已选中但不在列表中的 ID
+                      const userMap = new Map(userList.map(u => [u.id, u]));
+                      const allOptions = [...userList];
+                      excludeIds.forEach(id => {
+                        if (!userMap.has(id)) {
+                          allOptions.push({ id, username: `用户${id}`, role: 0 });
+                        }
+                      });
+                      return allOptions.map((user) => (
+                        <Select.Option key={user.id} value={user.id}>
+                          {user.username} (ID: {user.id}){user.role >= 100 ? ' 👑管理员' : ''}
+                        </Select.Option>
+                      ));
+                    })()}
                   </Select>
                   <Typography.Text type='tertiary' style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
                     {t('这些用户不会参与消费榜排名和参与奖抽取')}
