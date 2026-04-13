@@ -39,9 +39,12 @@ export default function SettingsSurpriseDay(props) {
   const [currentWinners, setCurrentWinners] = useState([]);
   const [currentEventDate, setCurrentEventDate] = useState('');
 
-  const loadUsers = async () => {
+  const loadUsers = async (keyword = '') => {
     try {
-      const res = await API.get('/api/user/?p=1&page_size=1000');
+      let url = keyword
+        ? `/api/user/search?keyword=${encodeURIComponent(keyword)}`
+        : '/api/user/?p=1&page_size=100';
+      const res = await API.get(url);
       const { success, data } = res.data;
       if (success && data && data.items) {
         setUserList(data.items);
@@ -208,43 +211,47 @@ export default function SettingsSurpriseDay(props) {
     { title: 'ID', dataIndex: 'event.id', key: 'id', width: 60, render: (_, record) => record.event?.id },
     { title: '日期', dataIndex: 'event.event_date', key: 'date', width: 120, render: (_, record) => record.event?.event_date },
     { title: '状态', dataIndex: 'event.status', key: 'status', width: 100, render: (_, record) => statusTag(record.event?.status) },
-    { title: '创建时间', dataIndex: 'event.created_at', key: 'created', width: 180, render: (_, record) => {
-      const ts = record.event?.created_at;
-      return ts ? new Date(ts * 1000).toLocaleString('zh-CN') : '-';
-    }},
-    { title: '操作', key: 'action', width: 200, render: (_, record) => {
-      const event = record.event;
-      if (!event) return null;
-      if (event.status === 0) {
-        return (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Popconfirm title="确认结算此活动？结算后将自动发放奖励。" onConfirm={() => handleSettle(event.id)}>
-              <Button theme="solid" type="primary" size="small" loading={settlingId === event.id}>
-                结算
-              </Button>
-            </Popconfirm>
-            <Popconfirm title="确认取消此活动？" onConfirm={() => handleCancel(event.id)}>
-              <Button theme="borderless" type="danger" size="small">取消</Button>
-            </Popconfirm>
-          </div>
-        );
+    {
+      title: '创建时间', dataIndex: 'event.created_at', key: 'created', width: 180, render: (_, record) => {
+        const ts = record.event?.created_at;
+        return ts ? new Date(ts * 1000).toLocaleString('zh-CN') : '-';
       }
-      if (event.status === 1) {
-        return (
-          <div style={{ display: 'flex', gap: 8 }}>
-            {record.winners?.length > 0 && (
-              <Button theme="borderless" size="small" onClick={() => handleViewWinners(record)}>
-                查看中奖者
-              </Button>
-            )}
-            <Popconfirm title="重置会回退已发放的奖励并删除中奖记录，确认重置？" onConfirm={() => handleReset(event.id)}>
-              <Button theme="borderless" type="warning" size="small" loading={settlingId === event.id}>重置</Button>
-            </Popconfirm>
-          </div>
-        );
+    },
+    {
+      title: '操作', key: 'action', width: 200, render: (_, record) => {
+        const event = record.event;
+        if (!event) return null;
+        if (event.status === 0) {
+          return (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Popconfirm title="确认结算此活动？结算后将自动发放奖励。" onConfirm={() => handleSettle(event.id)}>
+                <Button theme="solid" type="primary" size="small" loading={settlingId === event.id}>
+                  结算
+                </Button>
+              </Popconfirm>
+              <Popconfirm title="确认取消此活动？" onConfirm={() => handleCancel(event.id)}>
+                <Button theme="borderless" type="danger" size="small">取消</Button>
+              </Popconfirm>
+            </div>
+          );
+        }
+        if (event.status === 1) {
+          return (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {record.winners?.length > 0 && (
+                <Button theme="borderless" size="small" onClick={() => handleViewWinners(record)}>
+                  查看中奖者
+                </Button>
+              )}
+              <Popconfirm title="重置会回退已发放的奖励并删除中奖记录，确认重置？" onConfirm={() => handleReset(event.id)}>
+                <Button theme="borderless" type="warning" size="small" loading={settlingId === event.id}>重置</Button>
+              </Popconfirm>
+            </div>
+          );
+        }
+        return '-';
       }
-      return '-';
-    }},
+    },
   ];
 
   return (
@@ -343,9 +350,10 @@ export default function SettingsSurpriseDay(props) {
                     {t('排除的用户')}
                   </Typography.Text>
                   <Select
-                    multiple filter style={{ width: '100%' }}
-                    placeholder={t('搜索并选择要排除的用户')}
+                    multiple remote filter style={{ width: '100%' }}
+                    placeholder={t('输入用户名搜索，或浏览选择')}
                     value={excludeIds} disabled={!isEnabled}
+                    onSearch={(keyword) => loadUsers(keyword)}
                     onChange={(values) => {
                       setExcludeIds(values);
                       const str = serializeExcludeIds(values);
@@ -353,7 +361,6 @@ export default function SettingsSurpriseDay(props) {
                     }}
                   >
                     {(() => {
-                      // 合并用户列表和已选中但不在列表中的 ID
                       const userMap = new Map(userList.map(u => [u.id, u]));
                       const allOptions = [...userList];
                       excludeIds.forEach(id => {
@@ -430,10 +437,12 @@ export default function SettingsSurpriseDay(props) {
             dataSource={currentWinners} rowKey="id" pagination={false} size="small"
             columns={[
               { title: '用户ID', dataIndex: 'user_id', width: 80 },
-              { title: '类型', dataIndex: 'reward_type', width: 100, render: (text) => {
-                const map = { top1: '🥇 第1名', top2: '🥈 第2名', top3: '🥉 第3名', lucky: '🎉 参与奖' };
-                return map[text] || text;
-              }},
+              {
+                title: '类型', dataIndex: 'reward_type', width: 100, render: (text) => {
+                  const map = { top1: '🥇 第1名', top2: '🥈 第2名', top3: '🥉 第3名', lucky: '🎉 参与奖' };
+                  return map[text] || text;
+                }
+              },
               { title: '奖励额度', dataIndex: 'reward_quota', width: 100 },
             ]}
           />
