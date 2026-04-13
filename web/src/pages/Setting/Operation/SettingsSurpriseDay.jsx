@@ -73,7 +73,7 @@ export default function SettingsSurpriseDay(props) {
     }
     const dateStr = typeof createDate === 'string'
       ? createDate
-      : new Date(createDate).toISOString().split('T')[0];
+      : `${createDate.getFullYear()}-${String(createDate.getMonth() + 1).padStart(2, '0')}-${String(createDate.getDate()).padStart(2, '0')}`;
     try {
       const res = await API.post('/api/surprise_day/admin/event', { event_date: dateStr });
       if (res.data.success) {
@@ -179,11 +179,11 @@ export default function SettingsSurpriseDay(props) {
 
   const statusTag = (status) => {
     const map = {
-      pending: { color: 'blue', text: '待结算' },
-      settled: { color: 'green', text: '已结算' },
-      cancelled: { color: 'grey', text: '已取消' },
+      0: { color: 'blue', text: '待结算' },
+      1: { color: 'green', text: '已结算' },
+      2: { color: 'grey', text: '已取消' },
     };
-    const cfg = map[status] || { color: 'grey', text: status };
+    const cfg = map[status] || { color: 'grey', text: String(status) };
     return <Tag color={cfg.color}>{cfg.text}</Tag>;
   };
 
@@ -198,7 +198,7 @@ export default function SettingsSurpriseDay(props) {
     { title: '操作', key: 'action', width: 200, render: (_, record) => {
       const event = record.event;
       if (!event) return null;
-      if (event.status === 'pending') {
+      if (event.status === 0) {
         return (
           <div style={{ display: 'flex', gap: 8 }}>
             <Popconfirm title="确认结算此活动？结算后将自动发放奖励。" onConfirm={() => handleSettle(event.id)}>
@@ -212,7 +212,7 @@ export default function SettingsSurpriseDay(props) {
           </div>
         );
       }
-      if (event.status === 'settled' && record.winners?.length > 0) {
+      if (event.status === 1 && record.winners?.length > 0) {
         return (
           <Button theme="borderless" size="small" onClick={() => handleViewWinners(record)}>
             查看中奖者

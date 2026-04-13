@@ -1,0 +1,20 @@
+version: '3.4'
+
+services:
+  new-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: new-api-plus:latest
+    container_name: new-api
+    restart: always
+    network_mode: host
+    volumes:
+      - /data/new-api:/data
+    environment:
+      - SQL_DSN=root:mysql_onlywjt@tcp(127.0.0.1:3306)/oneapi?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_CONN_STRING=redis://:redis_onlyWjt@127.0.0.1:6379
+      - SESSION_SECRET=0e7c7788d2da9bbe6cba09949bc60a665dfb4cc503d3914636c6231fe1842956
+      - BATCH_UPDATE_ENABLED=true
+      - TZ=Asia/Shanghai
+      - PORT=5678
