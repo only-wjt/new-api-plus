@@ -343,18 +343,20 @@ export default function SettingsSurpriseDay(props) {
                     {t('排除的用户')}
                   </Typography.Text>
                   <Select
-                    multiple filter style={{ width: '100%' }}
-                    placeholder={t('搜索并选择要排除的用户')}
+                    multiple filter allowCreate style={{ width: '100%' }}
+                    placeholder={t('搜索并选择要排除的用户，也可手动输入用户 ID')}
                     value={excludeIds} disabled={!isEnabled}
                     onChange={(values) => {
-                      setExcludeIds(values);
-                      const str = serializeExcludeIds(values);
+                      // 确保值都是数字
+                      const numValues = values.map(v => typeof v === 'string' ? parseInt(v, 10) : v).filter(n => !isNaN(n) && n > 0);
+                      setExcludeIds(numValues);
+                      const str = serializeExcludeIds(numValues);
                       setInputs((prev) => ({ ...prev, 'surprise_day_setting.exclude_user_ids': str }));
                     }}
                   >
                     {userList.map((user) => (
                       <Select.Option key={user.id} value={user.id}>
-                        {user.username} (ID: {user.id})
+                        {user.username} (ID: {user.id}){user.role >= 100 ? ' 👑管理员' : ''}
                       </Select.Option>
                     ))}
                   </Select>
