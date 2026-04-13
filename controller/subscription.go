@@ -126,10 +126,7 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "价格不能超过9999")
 		return
 	}
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
-	}
-	req.Plan.Currency = "USD"
+	// 币种跟随前端传入，不再硬编码 USD
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}
@@ -143,6 +140,19 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 	if req.Plan.TotalAmount < 0 {
 		common.ApiErrorMsg(c, "总额度不能为负数")
 		return
+	}
+	// 多级限额校验
+	if req.Plan.SlidingWindowHours < 0 {
+		req.Plan.SlidingWindowHours = 0
+	}
+	if req.Plan.SlidingWindowLimit < 0 {
+		req.Plan.SlidingWindowLimit = 0
+	}
+	if req.Plan.DailyLimit < 0 {
+		req.Plan.DailyLimit = 0
+	}
+	if req.Plan.WeeklyLimit < 0 {
+		req.Plan.WeeklyLimit = 0
 	}
 	req.Plan.UpgradeGroup = strings.TrimSpace(req.Plan.UpgradeGroup)
 	if req.Plan.UpgradeGroup != "" {
@@ -189,10 +199,7 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	req.Plan.Id = id
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
-	}
-	req.Plan.Currency = "USD"
+	// 币种跟随前端传入，不再硬编码 USD
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}
@@ -206,6 +213,19 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 	if req.Plan.TotalAmount < 0 {
 		common.ApiErrorMsg(c, "总额度不能为负数")
 		return
+	}
+	// 多级限额校验
+	if req.Plan.SlidingWindowHours < 0 {
+		req.Plan.SlidingWindowHours = 0
+	}
+	if req.Plan.SlidingWindowLimit < 0 {
+		req.Plan.SlidingWindowLimit = 0
+	}
+	if req.Plan.DailyLimit < 0 {
+		req.Plan.DailyLimit = 0
+	}
+	if req.Plan.WeeklyLimit < 0 {
+		req.Plan.WeeklyLimit = 0
 	}
 	req.Plan.UpgradeGroup = strings.TrimSpace(req.Plan.UpgradeGroup)
 	if req.Plan.UpgradeGroup != "" {
@@ -239,6 +259,10 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"upgrade_group":              req.Plan.UpgradeGroup,
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,
 			"quota_reset_custom_seconds": req.Plan.QuotaResetCustomSeconds,
+			"sliding_window_hours":       req.Plan.SlidingWindowHours,
+			"sliding_window_limit":       req.Plan.SlidingWindowLimit,
+			"daily_limit":                req.Plan.DailyLimit,
+			"weekly_limit":               req.Plan.WeeklyLimit,
 			"updated_at":                 common.GetTimestamp(),
 		}
 		if err := tx.Model(&model.SubscriptionPlan{}).Where("id = ?", id).Updates(updateMap).Error; err != nil {

@@ -101,6 +101,24 @@ const renderPlanTitle = (text, record, t) => {
         <Text>{formatDuration(plan, t)}</Text>
         <Text type='tertiary'>{t('重置')}</Text>
         <Text>{formatResetPeriod(plan, t)}</Text>
+        {plan?.sliding_window_hours > 0 && plan?.sliding_window_limit > 0 && (
+          <>
+            <Text type='tertiary'>{t('滑动窗口')}</Text>
+            <Text>{plan.sliding_window_hours}{t('小时')} / {renderQuota(plan.sliding_window_limit)}</Text>
+          </>
+        )}
+        {plan?.daily_limit > 0 && (
+          <>
+            <Text type='tertiary'>{t('日限')}</Text>
+            <Text>{renderQuota(plan.daily_limit)}</Text>
+          </>
+        )}
+        {plan?.weekly_limit > 0 && (
+          <>
+            <Text type='tertiary'>{t('周限')}</Text>
+            <Text>{renderQuota(plan.weekly_limit)}</Text>
+          </>
+        )}
       </div>
     </div>
   );
@@ -199,6 +217,37 @@ const renderResetPeriod = (text, record, t) => {
     <Text type={isNever ? 'tertiary' : 'secondary'}>
       {formatResetPeriod(record?.plan, t)}
     </Text>
+  );
+};
+
+const renderUsageLimits = (text, record, t) => {
+  const plan = record?.plan;
+  const hasSliding = plan?.sliding_window_hours > 0 && plan?.sliding_window_limit > 0;
+  const hasDaily = plan?.daily_limit > 0;
+  const hasWeekly = plan?.weekly_limit > 0;
+
+  if (!hasSliding && !hasDaily && !hasWeekly) {
+    return <Text type='tertiary'>{t('不限')}</Text>;
+  }
+
+  return (
+    <Space spacing={4} wrap>
+      {hasSliding && (
+        <Tag color='blue' shape='circle' size='small'>
+          {plan.sliding_window_hours}{t('小时')}: {renderQuota(plan.sliding_window_limit)}
+        </Tag>
+      )}
+      {hasDaily && (
+        <Tag color='green' shape='circle' size='small'>
+          {t('日限')}: {renderQuota(plan.daily_limit)}
+        </Tag>
+      )}
+      {hasWeekly && (
+        <Tag color='orange' shape='circle' size='small'>
+          {t('周限')}: {renderQuota(plan.weekly_limit)}
+        </Tag>
+      )}
+    </Space>
   );
 };
 
@@ -339,6 +388,11 @@ export const getSubscriptionsColumns = ({
       title: t('总额度'),
       width: 100,
       render: (text, record) => renderTotalAmount(text, record, t),
+    },
+    {
+      title: t('使用限额'),
+      width: 200,
+      render: (text, record) => renderUsageLimits(text, record, t),
     },
     {
       title: t('升级分组'),

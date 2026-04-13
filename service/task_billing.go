@@ -159,6 +159,11 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 		return
 	}
 
+	// 1.5 订阅退款时清理滑动窗口记录（最佳尽力，失败只记日志）
+	if taskIsSubscription(task) && task.PrivateData.SubscriptionId > 0 {
+		_ = model.RemoveSlidingWindowRecord(task.PrivateData.SubscriptionId, task.TaskID)
+	}
+
 	// 2. 退还令牌额度
 	taskAdjustTokenQuota(ctx, task, -quota)
 

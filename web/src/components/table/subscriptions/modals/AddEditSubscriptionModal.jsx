@@ -38,7 +38,7 @@ import {
   IconCreditCard,
   IconSave,
 } from '@douyinfe/semi-icons';
-import { Clock, RefreshCw } from 'lucide-react';
+import { Clock, RefreshCw, Shield } from 'lucide-react';
 import { API, showError, showSuccess } from '../../../../helpers';
 import {
   quotaToDisplayAmount,
@@ -97,6 +97,10 @@ const AddEditSubscriptionModal = ({
     upgrade_group: '',
     stripe_price_id: '',
     creem_product_id: '',
+    sliding_window_hours: 0,
+    sliding_window_limit: 0,
+    daily_limit: 0,
+    weekly_limit: 0,
   });
 
   const buildFormValues = () => {
@@ -108,7 +112,7 @@ const AddEditSubscriptionModal = ({
       title: p.title || '',
       subtitle: p.subtitle || '',
       price_amount: Number(p.price_amount || 0),
-      currency: 'USD',
+      currency: p.currency || 'USD',
       duration_unit: p.duration_unit || 'month',
       duration_value: Number(p.duration_value || 1),
       custom_seconds: Number(p.custom_seconds || 0),
@@ -123,6 +127,16 @@ const AddEditSubscriptionModal = ({
       upgrade_group: p.upgrade_group || '',
       stripe_price_id: p.stripe_price_id || '',
       creem_product_id: p.creem_product_id || '',
+      sliding_window_hours: Number(p.sliding_window_hours || 0),
+      sliding_window_limit: Number(
+        quotaToDisplayAmount(p.sliding_window_limit || 0).toFixed(2),
+      ),
+      daily_limit: Number(
+        quotaToDisplayAmount(p.daily_limit || 0).toFixed(2),
+      ),
+      weekly_limit: Number(
+        quotaToDisplayAmount(p.weekly_limit || 0).toFixed(2),
+      ),
     };
   };
 
@@ -152,7 +166,7 @@ const AddEditSubscriptionModal = ({
         plan: {
           ...values,
           price_amount: Number(values.price_amount || 0),
-          currency: 'USD',
+          currency: values.currency || '',
           duration_value: Number(values.duration_value || 0),
           custom_seconds: Number(values.custom_seconds || 0),
           quota_reset_period: values.quota_reset_period || 'never',
@@ -164,6 +178,10 @@ const AddEditSubscriptionModal = ({
           max_purchase_per_user: Number(values.max_purchase_per_user || 0),
           total_amount: displayAmountToQuota(values.total_amount),
           upgrade_group: values.upgrade_group || '',
+          sliding_window_hours: Number(values.sliding_window_hours || 0),
+          sliding_window_limit: displayAmountToQuota(values.sliding_window_limit || 0),
+          daily_limit: displayAmountToQuota(values.daily_limit || 0),
+          weekly_limit: displayAmountToQuota(values.weekly_limit || 0),
         },
       };
       if (editingPlan?.plan?.id) {
@@ -497,6 +515,70 @@ const AddEditSubscriptionModal = ({
                           disabled
                         />
                       )}
+                    </Col>
+                  </Row>
+                </Card>
+
+                {/* 使用限额 */}
+                <Card className='!rounded-2xl shadow-sm border-0 mb-4'>
+                  <div className='flex items-center mb-2'>
+                    <Avatar
+                      size='small'
+                      color='red'
+                      className='mr-2 shadow-md'
+                    >
+                      <Shield size={16} />
+                    </Avatar>
+                    <div>
+                      <Text className='text-lg font-medium'>
+                        {t('使用限额')}
+                      </Text>
+                      <div className='text-xs text-gray-600'>
+                        {t('支持多级限额叠加，参考 GLM CodingPlan 模式。限速触发时将直接拒绝请求，不会回退到钱包。')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='sliding_window_hours'
+                        label={t('滑动窗口时长(小时)')}
+                        min={0}
+                        precision={0}
+                        extraText={t('0 = 不启用，如 5 = 每 5 小时滑动窗口')}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='sliding_window_limit'
+                        label={t('窗口内限额')}
+                        min={0}
+                        precision={2}
+                        extraText={t('滑动窗口内最大消耗额度，0 = 不限')}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='daily_limit'
+                        label={t('日限额度')}
+                        min={0}
+                        precision={2}
+                        extraText={t('每日 00:00 重置，0 = 不限')}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='weekly_limit'
+                        label={t('周限额度')}
+                        min={0}
+                        precision={2}
+                        extraText={t('每周一 00:00 重置，0 = 不限')}
+                        style={{ width: '100%' }}
+                      />
                     </Col>
                   </Row>
                 </Card>

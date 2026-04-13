@@ -401,5 +401,21 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
+
+		// 惊喜日活动路由
+		surpriseDayRoute := apiRouter.Group("/surprise_day")
+		surpriseDayRoute.Use(middleware.UserAuth())
+		{
+			surpriseDayRoute.GET("/current", controller.GetCurrentSurpriseDay)
+			surpriseDayRoute.GET("/history", controller.GetSurpriseDayHistory)
+		}
+		surpriseDayAdminRoute := apiRouter.Group("/surprise_day/admin")
+		surpriseDayAdminRoute.Use(middleware.AdminAuth())
+		{
+			surpriseDayAdminRoute.GET("/events", controller.AdminGetSurpriseDayEvents)
+			surpriseDayAdminRoute.POST("/event", controller.AdminCreateSurpriseDayEvent)
+			surpriseDayAdminRoute.DELETE("/event/:id", controller.AdminCancelSurpriseDayEvent)
+			surpriseDayAdminRoute.POST("/settle/:id", controller.AdminSettleSurpriseDay)
+		}
 	}
 }

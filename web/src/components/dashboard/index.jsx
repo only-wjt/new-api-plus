@@ -30,6 +30,7 @@ import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
 import UptimePanel from './UptimePanel';
 import SearchModal from './modals/SearchModal';
+import SurpriseDayPanel from './SurpriseDayPanel';
 
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
@@ -200,6 +201,13 @@ const Dashboard = () => {
               t={dashboardData.t}
             />
           )}
+        </div>
+      </div>
+
+      {/* 惊喜日活动卡片 */}
+      <div className='mb-4'>
+        <div className='grid grid-cols-1 lg:grid-cols-4 gap-4'>
+          <SurpriseDayPanel CARD_PROPS={CARD_PROPS} />
         </div>
       </div>
 

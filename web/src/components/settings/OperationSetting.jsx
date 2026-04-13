@@ -27,6 +27,7 @@ import SettingsLog from '../../pages/Setting/Operation/SettingsLog';
 import SettingsMonitoring from '../../pages/Setting/Operation/SettingsMonitoring';
 import SettingsCreditLimit from '../../pages/Setting/Operation/SettingsCreditLimit';
 import SettingsCheckin from '../../pages/Setting/Operation/SettingsCheckin';
+import SettingsSurpriseDay from '../../pages/Setting/Operation/SettingsSurpriseDay';
 import SettingsMaintenance from '../../pages/Setting/Operation/SettingsMaintenance';
 import SettingsTimeDynamicRatio from '../../pages/Setting/Operation/SettingsTimeDynamicRatio';
 import SettingsConcurrency from '../../pages/Setting/Operation/SettingsConcurrency';
@@ -81,6 +82,19 @@ const OperationSetting = () => {
     'checkin_setting.enabled': false,
     'checkin_setting.min_quota': 1000,
     'checkin_setting.max_quota': 10000,
+
+    /* 惊喜日设置 */
+    'surprise_day_setting.enabled': false,
+    'surprise_day_setting.visibility': 'all',
+    'surprise_day_setting.top1_refund_percent': 50,
+    'surprise_day_setting.top2_refund_percent': 35,
+    'surprise_day_setting.top3_refund_percent': 20,
+    'surprise_day_setting.lucky_draw_count': 3,
+    'surprise_day_setting.lucky_draw_quota': 2500000,
+    'surprise_day_setting.settlement_hour': 21,
+    'surprise_day_setting.settlement_minute': 0,
+    'surprise_day_setting.timezone': 'Asia/Shanghai',
+    'surprise_day_setting.exclude_user_ids': '',
 
     /* 令牌设置 */
     'token_setting.max_user_tokens': 1000,
@@ -168,6 +182,10 @@ const OperationSetting = () => {
         {/* 签到设置 */}
         <Card style={{ marginTop: '10px' }}>
           <SettingsCheckin options={inputs} refresh={onRefresh} />
+        </Card>
+        {/* 惊喜日设置 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsSurpriseDay options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>

@@ -502,6 +502,18 @@ const SubscriptionPlansCard = ({
                   formatSubscriptionResetPeriod(plan, t) === t('不重置')
                     ? null
                     : `${t('额度重置')}: ${formatSubscriptionResetPeriod(plan, t)}`;
+                const slidingWindowLabel =
+                  plan?.sliding_window_hours > 0 && plan?.sliding_window_limit > 0
+                    ? `${t('每')} ${plan.sliding_window_hours} ${t('小时')}: ${renderQuota(plan.sliding_window_limit)}`
+                    : null;
+                const dailyLimitLabel =
+                  plan?.daily_limit > 0
+                    ? `${t('日限')}: ${renderQuota(plan.daily_limit)}`
+                    : null;
+                const weeklyLimitLabel =
+                  plan?.weekly_limit > 0
+                    ? `${t('周限')}: ${renderQuota(plan.weekly_limit)}`
+                    : null;
                 const planBenefits = [
                   {
                     label: `${t('有效期')}: ${formatSubscriptionDuration(plan, t)}`,
@@ -513,6 +525,9 @@ const SubscriptionPlansCard = ({
                         tooltip: `${t('原生额度')}：${totalAmount}`,
                       }
                     : { label: totalLabel },
+                  slidingWindowLabel ? { label: slidingWindowLabel } : null,
+                  dailyLimitLabel ? { label: dailyLimitLabel } : null,
+                  weeklyLimitLabel ? { label: weeklyLimitLabel } : null,
                   limitLabel ? { label: limitLabel } : null,
                   upgradeLabel ? { label: upgradeLabel } : null,
                 ].filter(Boolean);

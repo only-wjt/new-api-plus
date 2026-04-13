@@ -175,6 +175,18 @@ type SubscriptionPlan struct {
 	QuotaResetPeriod        string `json:"quota_reset_period" gorm:"type:varchar(16);default:'never'"`
 	QuotaResetCustomSeconds int64  `json:"quota_reset_custom_seconds" gorm:"type:bigint;default:0"`
 
+	// 滑动窗口限额（Redis 实现，0=不启用）
+	// SlidingWindowHours 窗口时长（小时），如 5 表示最近 5 小时
+	SlidingWindowHours int `json:"sliding_window_hours" gorm:"type:int;default:0"`
+	// SlidingWindowLimit 窗口内最大消耗额度（quota 单位，0=不限）
+	SlidingWindowLimit int64 `json:"sliding_window_limit" gorm:"type:bigint;default:0"`
+
+	// 固定周期限额（与月限/总额度叠加生效，0=不限）
+	// DailyLimit 每日自然日 00:00 重置
+	DailyLimit int64 `json:"daily_limit" gorm:"type:bigint;default:0"`
+	// WeeklyLimit 每周一 00:00 重置
+	WeeklyLimit int64 `json:"weekly_limit" gorm:"type:bigint;default:0"`
+
 	CreatedAt int64 `json:"created_at" gorm:"bigint"`
 	UpdatedAt int64 `json:"updated_at" gorm:"bigint"`
 }
@@ -249,6 +261,10 @@ type UserSubscription struct {
 
 	UpgradeGroup  string `json:"upgrade_group" gorm:"type:varchar(64);default:''"`
 	PrevUserGroup string `json:"prev_user_group" gorm:"type:varchar(64);default:''"`
+
+	// 固定周期已用量追踪（由定时任务重置）
+	DailyUsed  int64 `json:"daily_used" gorm:"type:bigint;default:0"`
+	WeeklyUsed int64 `json:"weekly_used" gorm:"type:bigint;default:0"`
 
 	CreatedAt int64 `json:"created_at" gorm:"bigint"`
 	UpdatedAt int64 `json:"updated_at" gorm:"bigint"`
@@ -952,7 +968,73 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 	return tx.Save(sub).Error
 }
 
+// ErrNoActiveSubscription 无有效订阅（可回退钱包）
+var ErrNoActiveSubscription = errors.New("no active subscription")
+
+// ErrSubscriptionQuotaInsufficient 所有订阅总额度不足（可回退钱包）
+var ErrSubscriptionQuotaInsufficient = errors.New("subscription quota insufficient")
+
+// ErrSubscriptionRateLimited 限速哨兵错误，用于区分"限速拒绝"和"总额度不足"。
+// 当此错误返回时，BillingSession 不应回退到钱包，而应直接拒绝请求。
+var ErrSubscriptionRateLimited = errors.New("subscription rate limited")
+
+// SubscriptionRateLimitError 包装限速错误，携带用户可读提示信息。
+type SubscriptionRateLimitError struct {
+	Message string // 用户可读的提示信息
+}
+
+func (e *SubscriptionRateLimitError) Error() string {
+	return e.Message
+}
+
+func (e *SubscriptionRateLimitError) Unwrap() error {
+	return ErrSubscriptionRateLimited
+}
+
+// checkMultiLevelLimits 检查日限/周限/滑动窗口是否允许本次预扣。
+// 返回 nil 表示通过，返回 *SubscriptionRateLimitError 表示限速触发。
+func checkMultiLevelLimits(sub *UserSubscription, plan *SubscriptionPlan, amount int64) error {
+	if plan == nil {
+		return nil
+	}
+
+	// 1. 日限检查
+	if plan.DailyLimit > 0 {
+		if sub.DailyUsed+amount > plan.DailyLimit {
+			return &SubscriptionRateLimitError{
+				Message: fmt.Sprintf("今日订阅额度已用尽（已用 %d / 上限 %d），将于明日 00:00 重置。如需继续使用，请切换计费偏好为「仅用钱包」。",
+					sub.DailyUsed, plan.DailyLimit),
+			}
+		}
+	}
+
+	// 2. 周限检查
+	if plan.WeeklyLimit > 0 {
+		if sub.WeeklyUsed+amount > plan.WeeklyLimit {
+			return &SubscriptionRateLimitError{
+				Message: fmt.Sprintf("本周订阅额度已用尽（已用 %d / 上限 %d），将于下周一 00:00 重置。如需继续使用，请切换计费偏好为「仅用钱包」。",
+					sub.WeeklyUsed, plan.WeeklyLimit),
+			}
+		}
+	}
+
+	// 3. 滑动窗口检查（Redis 查询，Redis 不可用时降级放行）
+	if plan.SlidingWindowHours > 0 && plan.SlidingWindowLimit > 0 {
+		windowUsed, _ := GetSlidingWindowUsage(sub.Id, plan.SlidingWindowHours)
+		if windowUsed+amount > plan.SlidingWindowLimit {
+			return &SubscriptionRateLimitError{
+				Message: fmt.Sprintf("%d 小时滑动窗口额度已用尽（已用 %d / 上限 %d），额度将随时间推移自动释放。如需继续使用，请切换计费偏好为「仅用钱包」。",
+					plan.SlidingWindowHours, windowUsed, plan.SlidingWindowLimit),
+			}
+		}
+	}
+
+	return nil
+}
+
 // PreConsumeUserSubscription pre-consumes from any active subscription total quota.
+// 当限速触发时返回 *SubscriptionRateLimitError（Unwrap 为 ErrSubscriptionRateLimited），
+// 调用方可通过 errors.Is(err, ErrSubscriptionRateLimited) 判断是否为限速拒绝。
 func PreConsumeUserSubscription(requestId string, userId int, modelName string, quotaType int, amount int64) (*SubscriptionPreConsumeResult, error) {
 	if userId <= 0 {
 		return nil, errors.New("invalid userId")
@@ -966,6 +1048,9 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 	now := GetDBTimestamp()
 
 	returnValue := &SubscriptionPreConsumeResult{}
+	// 记录用于事务外 Redis 写入的信息
+	var slidingWindowSubId int
+	var slidingWindowHours int
 
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var existing SubscriptionPreConsumeRecord
@@ -994,11 +1079,15 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
 			Order("end_time asc, id asc").
 			Find(&subs).Error; err != nil {
-			return errors.New("no active subscription")
+			return ErrNoActiveSubscription
 		}
 		if len(subs) == 0 {
-			return errors.New("no active subscription")
+			return ErrNoActiveSubscription
 		}
+
+		// 记录最后一次限速错误，用于在所有订阅都检查完后返回
+		var lastRateLimitErr error
+
 		for _, candidate := range subs {
 			sub := candidate
 			plan, err := getSubscriptionPlanByIdTx(tx, sub.PlanId)
@@ -1009,12 +1098,20 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 				return err
 			}
 			usedBefore := sub.AmountUsed
+			// 总额度/月限检查（现有逻辑）
 			if sub.AmountTotal > 0 {
 				remain := sub.AmountTotal - usedBefore
 				if remain < amount {
 					continue
 				}
 			}
+
+			// 多级限额检查（新增）
+			if limitErr := checkMultiLevelLimits(&sub, plan, amount); limitErr != nil {
+				lastRateLimitErr = limitErr
+				continue
+			}
+
 			record := &SubscriptionPreConsumeRecord{
 				RequestId:          requestId,
 				UserId:             userId,
@@ -1038,6 +1135,8 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 				return err
 			}
 			sub.AmountUsed += amount
+			sub.DailyUsed += amount
+			sub.WeeklyUsed += amount
 			if err := tx.Save(&sub).Error; err != nil {
 				return err
 			}
@@ -1046,13 +1145,29 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			returnValue.AmountTotal = sub.AmountTotal
 			returnValue.AmountUsedBefore = usedBefore
 			returnValue.AmountUsedAfter = sub.AmountUsed
+			// 记录滑动窗口信息，事务外写入 Redis
+			if plan.SlidingWindowHours > 0 && plan.SlidingWindowLimit > 0 {
+				slidingWindowSubId = sub.Id
+				slidingWindowHours = plan.SlidingWindowHours
+			}
 			return nil
 		}
-		return fmt.Errorf("subscription quota insufficient, need=%d", amount)
+
+		// 所有订阅都不满足 — 如果有限速错误，优先返回限速错误（不可回退钱包）
+		if lastRateLimitErr != nil {
+			return lastRateLimitErr
+		}
+		return fmt.Errorf("%w: need=%d", ErrSubscriptionQuotaInsufficient, amount)
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	// 事务外：最佳尽力写入 Redis 滑动窗口记录（失败只记日志，不影响预扣结果）
+	if slidingWindowSubId > 0 && slidingWindowHours > 0 {
+		_ = AddSlidingWindowRecord(slidingWindowSubId, requestId, amount, slidingWindowHours)
+	}
+
 	return returnValue, nil
 }
 
@@ -1061,7 +1176,10 @@ func RefundSubscriptionPreConsume(requestId string) error {
 	if strings.TrimSpace(requestId) == "" {
 		return errors.New("requestId is empty")
 	}
-	return DB.Transaction(func(tx *gorm.DB) error {
+	var refundSubId int
+	var refundReqId string
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
 		var record SubscriptionPreConsumeRecord
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").
 			Where("request_id = ?", requestId).First(&record).Error; err != nil {
@@ -1074,12 +1192,50 @@ func RefundSubscriptionPreConsume(requestId string) error {
 			record.Status = "refunded"
 			return tx.Save(&record).Error
 		}
-		if err := PostConsumeUserSubscriptionDelta(record.UserSubscriptionId, -record.PreConsumed); err != nil {
+		// 内联退还订阅额度（不再调用 PostConsumeUserSubscriptionDelta，避免嵌套事务）
+		var sub UserSubscription
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", record.UserSubscriptionId).
+			First(&sub).Error; err != nil {
+			return err
+		}
+		refundAmount := record.PreConsumed
+		newUsed := sub.AmountUsed - refundAmount
+		if newUsed < 0 {
+			newUsed = 0
+		}
+		newDaily := sub.DailyUsed - refundAmount
+		if newDaily < 0 {
+			newDaily = 0
+		}
+		newWeekly := sub.WeeklyUsed - refundAmount
+		if newWeekly < 0 {
+			newWeekly = 0
+		}
+		if err := tx.Model(&sub).Updates(map[string]interface{}{
+			"amount_used": newUsed,
+			"daily_used":  newDaily,
+			"weekly_used": newWeekly,
+		}).Error; err != nil {
 			return err
 		}
 		record.Status = "refunded"
-		return tx.Save(&record).Error
+		if err := tx.Save(&record).Error; err != nil {
+			return err
+		}
+		// 事务内退款成功，记录 subId 用于事务外清理 Redis 滑动窗口
+		refundSubId = record.UserSubscriptionId
+		refundReqId = requestId
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// 事务外：最佳尽力移除 Redis 滑动窗口记录（失败只记日志，不影响退款结果）
+	if refundSubId > 0 {
+		_ = RemoveSlidingWindowRecord(refundSubId, refundReqId)
+	}
+	return nil
 }
 
 // ResetDueSubscriptions resets subscriptions whose next_reset_time has passed.
@@ -1187,6 +1343,25 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 			return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
 		}
 		sub.AmountUsed = newUsed
+
+		// 同步更新日/周计数器
+		if delta > 0 {
+			sub.DailyUsed += delta
+			sub.WeeklyUsed += delta
+		} else {
+			newDaily := sub.DailyUsed + delta
+			if newDaily < 0 {
+				newDaily = 0
+			}
+			sub.DailyUsed = newDaily
+
+			newWeekly := sub.WeeklyUsed + delta
+			if newWeekly < 0 {
+				newWeekly = 0
+			}
+			sub.WeeklyUsed = newWeekly
+		}
+
 		return tx.Save(&sub).Error
 	})
 }

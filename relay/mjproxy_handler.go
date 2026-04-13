@@ -215,18 +215,32 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 			Description: "quota_not_enough",
 		}
 	}
+
+	// 预扣费：原子减少用户额度，防止并发超额消费
+	if err := model.DecreaseUserQuota(info.UserId, priceData.Quota); err != nil {
+		return &dto.MidjourneyResponse{
+			Code:        4,
+			Description: fmt.Sprintf("pre_consume_quota_failed: %s", err.Error()),
+		}
+	}
+	preConsumed := true
+
 	requestURL := getMjRequestPath(c.Request.URL.String())
 	baseURL := c.GetString("base_url")
 	fullRequestURL := fmt.Sprintf("%s%s", baseURL, requestURL)
 	mjResp, _, err := service.DoMidjourneyHttpRequest(c, time.Second*60, fullRequestURL)
 	if err != nil {
+		// 请求失败，退还预扣费
+		if preConsumed {
+			_ = model.IncreaseUserQuota(info.UserId, priceData.Quota, false)
+		}
 		return &mjResp.Response
 	}
 	defer func() {
 		if mjResp.StatusCode == 200 && mjResp.Response.Code == 1 {
-			err := service.PostConsumeQuota(info, priceData.Quota, 0, true)
-			if err != nil {
-				common.SysLog("error consuming token remain quota: " + err.Error())
+			// 预扣费已完成，只需扣减令牌额度和记录日志
+			if !info.IsPlayground {
+				_ = model.DecreaseTokenQuota(info.TokenId, info.TokenKey, priceData.Quota)
 			}
 
 			tokenName := c.GetString("token_name")
@@ -244,6 +258,11 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 			})
 			model.UpdateUserUsedQuotaAndRequestCount(info.UserId, priceData.Quota)
 			model.UpdateChannelUsedQuota(info.ChannelId, priceData.Quota)
+		} else {
+			// 上游返回非成功，退还预扣费
+			if preConsumed {
+				_ = model.IncreaseUserQuota(info.UserId, priceData.Quota, false)
+			}
 		}
 	}()
 	midjResponse := &mjResp.Response
@@ -523,17 +542,33 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		}
 	}
 
+	// 预扣费：原子减少用户额度，防止并发超额消费
+	preConsumed := false
+	if consumeQuota {
+		if err := model.DecreaseUserQuota(relayInfo.UserId, priceData.Quota); err != nil {
+			return &dto.MidjourneyResponse{
+				Code:        4,
+				Description: fmt.Sprintf("pre_consume_quota_failed: %s", err.Error()),
+			}
+		}
+		preConsumed = true
+	}
+
 	midjResponseWithStatus, responseBody, err := service.DoMidjourneyHttpRequest(c, time.Second*60, fullRequestURL)
 	if err != nil {
+		// 请求失败，退还预扣费
+		if preConsumed {
+			_ = model.IncreaseUserQuota(relayInfo.UserId, priceData.Quota, false)
+		}
 		return &midjResponseWithStatus.Response
 	}
 	midjResponse := &midjResponseWithStatus.Response
 
 	defer func() {
 		if consumeQuota && midjResponseWithStatus.StatusCode == 200 {
-			err := service.PostConsumeQuota(relayInfo, priceData.Quota, 0, true)
-			if err != nil {
-				common.SysLog("error consuming token remain quota: " + err.Error())
+			// 预扣费已完成，只需扣减令牌额度和记录日志
+			if !relayInfo.IsPlayground {
+				_ = model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, priceData.Quota)
 			}
 			tokenName := c.GetString("token_name")
 			logContent := fmt.Sprintf("模型固定价格 %.2f，分组倍率 %.2f，操作 %s，ID %s", priceData.ModelPrice, priceData.GroupRatioInfo.GroupRatio, midjRequest.Action, midjResponse.Result)
@@ -550,6 +585,9 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 			})
 			model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, priceData.Quota)
 			model.UpdateChannelUsedQuota(relayInfo.ChannelId, priceData.Quota)
+		} else if preConsumed {
+			// 上游返回非成功，退还预扣费
+			_ = model.IncreaseUserQuota(relayInfo.UserId, priceData.Quota, false)
 		}
 	}()
 

@@ -281,6 +281,8 @@ func migrateDB() error {
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
 		&UserConcurrencyOverride{},
+		&SurpriseDayEvent{},
+		&SurpriseDayWinner{},
 	)
 	if err != nil {
 		return err
@@ -330,6 +332,8 @@ func migrateDBFast() error {
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
 		{&UserConcurrencyOverride{}, "UserConcurrencyOverride"},
+		{&SurpriseDayEvent{}, "SurpriseDayEvent"},
+		{&SurpriseDayWinner{}, "SurpriseDayWinner"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))
@@ -404,6 +408,10 @@ func ensureSubscriptionPlanTableSQLite() error {
 ` + "`total_amount`" + ` bigint NOT NULL DEFAULT 0,
 ` + "`quota_reset_period`" + ` varchar(16) DEFAULT 'never',
 ` + "`quota_reset_custom_seconds`" + ` bigint DEFAULT 0,
+` + "`sliding_window_hours`" + ` integer DEFAULT 0,
+` + "`sliding_window_limit`" + ` bigint DEFAULT 0,
+` + "`daily_limit`" + ` bigint DEFAULT 0,
+` + "`weekly_limit`" + ` bigint DEFAULT 0,
 ` + "`created_at`" + ` bigint,
 ` + "`updated_at`" + ` bigint,
 PRIMARY KEY (` + "`id`" + `)
@@ -437,6 +445,11 @@ PRIMARY KEY (` + "`id`" + `)
 		{Name: "total_amount", DDL: "`total_amount` bigint NOT NULL DEFAULT 0"},
 		{Name: "quota_reset_period", DDL: "`quota_reset_period` varchar(16) DEFAULT 'never'"},
 		{Name: "quota_reset_custom_seconds", DDL: "`quota_reset_custom_seconds` bigint DEFAULT 0"},
+		// 多级限额字段
+		{Name: "sliding_window_hours", DDL: "`sliding_window_hours` integer DEFAULT 0"},
+		{Name: "sliding_window_limit", DDL: "`sliding_window_limit` bigint DEFAULT 0"},
+		{Name: "daily_limit", DDL: "`daily_limit` bigint DEFAULT 0"},
+		{Name: "weekly_limit", DDL: "`weekly_limit` bigint DEFAULT 0"},
 		{Name: "created_at", DDL: "`created_at` bigint"},
 		{Name: "updated_at", DDL: "`updated_at` bigint"},
 	}

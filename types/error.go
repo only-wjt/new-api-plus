@@ -85,6 +85,8 @@ const (
 	// quota error
 	ErrorCodeInsufficientUserQuota      ErrorCode = "insufficient_user_quota"
 	ErrorCodePreConsumeTokenQuotaFailed ErrorCode = "pre_consume_token_quota_failed"
+	// 订阅限速触发（日限/周限/滑动窗口），不可回退钱包
+	ErrorCodeSubscriptionRateLimited ErrorCode = "subscription_rate_limited"
 )
 
 type NewAPIError struct {
