@@ -275,12 +275,7 @@ func AdminCreateSurpriseDayEvent(dateStr string) (*model.SurpriseDayEvent, error
 		return nil, fmt.Errorf("日期格式无效，请使用 YYYY-MM-DD 格式: %w", err)
 	}
 
-	// 检查日期是否是过去的日期（允许今天）
-	today := time.Now().In(loc)
-	todayStr := today.Format("2006-01-02")
-	if dateStr < todayStr {
-		return nil, fmt.Errorf("不能指定过去的日期")
-	}
+	// 管理员可以创建任意日期的活动（包括过去的日期，用于回溯结算）
 
 	// 检查该日期是否已存在事件
 	existing, _ := model.GetSurpriseDayEventByDate(dateStr)
@@ -327,4 +322,40 @@ func AdminSettleSurpriseDay(eventId int) error {
 	}
 
 	return SettleSurpriseDay(event, loc)
+}
+
+// AdminResetSurpriseDayEvent 管理员重置已结算事件（回退奖励 + 重置状态）
+func AdminResetSurpriseDayEvent(eventId int) error {
+	event, err := model.GetSurpriseDayEventById(eventId)
+	if err != nil {
+		return fmt.Errorf("事件不存在: %w", err)
+	}
+
+	if event.Status != model.SurpriseDayStatusSettled {
+		return fmt.Errorf("只能重置已结算的事件 (当前状态: %d)", event.Status)
+	}
+
+	// 1. 查出中奖记录并删除
+	winners, err := model.DeleteWinnersByEventId(eventId)
+	if err != nil {
+		return fmt.Errorf("删除中奖记录失败: %w", err)
+	}
+
+	// 2. 回退已发放的奖励额度
+	for _, w := range winners {
+		if w.RefundQuota > 0 {
+			err := model.DecreaseUserQuota(w.UserId, w.RefundQuota)
+			if err != nil {
+				common.SysError(fmt.Sprintf("惊喜日重置-回退额度失败 [user=%d, quota=%d]: %s", w.UserId, w.RefundQuota, err.Error()))
+			}
+		}
+	}
+
+	// 3. 重置事件状态为待结算
+	if err := model.ResetSurpriseDayEvent(eventId); err != nil {
+		return fmt.Errorf("重置事件状态失败: %w", err)
+	}
+
+	common.SysLog(fmt.Sprintf("管理员重置惊喜日事件: %d, 回退了 %d 条中奖记录", eventId, len(winners)))
+	return nil
 }

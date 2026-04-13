@@ -416,6 +416,7 @@ func SetApiRouter(router *gin.Engine) {
 			surpriseDayAdminRoute.POST("/event", controller.AdminCreateSurpriseDayEvent)
 			surpriseDayAdminRoute.DELETE("/event/:id", controller.AdminCancelSurpriseDayEvent)
 			surpriseDayAdminRoute.POST("/settle/:id", controller.AdminSettleSurpriseDay)
+			surpriseDayAdminRoute.POST("/reset/:id", controller.AdminResetSurpriseDay)
 		}
 	}
 }

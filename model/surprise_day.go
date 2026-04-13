@@ -306,3 +306,39 @@ func GetWeekStartDate(date time.Time) string {
 	monday := date.AddDate(0, 0, -(weekday - 1))
 	return monday.Format("2006-01-02")
 }
+
+// ResetSurpriseDayEvent 重置已结算事件为待结算状态
+func ResetSurpriseDayEvent(eventId int) error {
+	result := DB.Model(&SurpriseDayEvent{}).
+		Where("id = ? AND status = ?", eventId, SurpriseDayStatusSettled).
+		Updates(map[string]interface{}{
+			"status":     SurpriseDayStatusPending,
+			"settled_at": 0,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("只能重置已结算的惊喜日事件")
+	}
+	return nil
+}
+
+// DeleteWinnersByEventId 删除指定事件的所有中奖记录
+func DeleteWinnersByEventId(eventId int) ([]SurpriseDayWinner, error) {
+	// 先查出中奖记录用于回退额度
+	var winners []SurpriseDayWinner
+	err := DB.Where("event_id = ?", eventId).Find(&winners).Error
+	if err != nil {
+		return nil, err
+	}
+	// 删除记录
+	if len(winners) > 0 {
+		err = DB.Where("event_id = ?", eventId).Delete(&SurpriseDayWinner{}).Error
+		if err != nil {
+			return nil, err
+		}
+	}
+	return winners, nil
+}
+

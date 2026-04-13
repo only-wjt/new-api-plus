@@ -119,6 +119,23 @@ export default function SettingsSurpriseDay(props) {
     }
   };
 
+  const handleReset = async (id) => {
+    setSettlingId(id);
+    try {
+      const res = await API.post(`/api/surprise_day/admin/reset/${id}`);
+      if (res.data.success) {
+        showSuccess('已重置，奖励已回退，可重新结算');
+        loadEvents();
+      } else {
+        showError(res.data.message || '重置失败');
+      }
+    } catch (e) {
+      showError('重置失败: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setSettlingId(null);
+    }
+  };
+
   const handleViewWinners = (item) => {
     setCurrentWinners(item.winners || []);
     setCurrentEventDate(item.event?.event_date || '');
@@ -212,11 +229,18 @@ export default function SettingsSurpriseDay(props) {
           </div>
         );
       }
-      if (event.status === 1 && record.winners?.length > 0) {
+      if (event.status === 1) {
         return (
-          <Button theme="borderless" size="small" onClick={() => handleViewWinners(record)}>
-            查看中奖者
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {record.winners?.length > 0 && (
+              <Button theme="borderless" size="small" onClick={() => handleViewWinners(record)}>
+                查看中奖者
+              </Button>
+            )}
+            <Popconfirm title="重置会回退已发放的奖励并删除中奖记录，确认重置？" onConfirm={() => handleReset(event.id)}>
+              <Button theme="borderless" type="warning" size="small" loading={settlingId === event.id}>重置</Button>
+            </Popconfirm>
+          </div>
         );
       }
       return '-';

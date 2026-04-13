@@ -228,6 +228,26 @@ func AdminSettleSurpriseDay(c *gin.Context) {
 	})
 }
 
+// AdminResetSurpriseDay 管理员重置已结算事件
+func AdminResetSurpriseDay(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		common.ApiErrorMsg(c, "无效的事件 ID")
+		return
+	}
+
+	if err := service.AdminResetSurpriseDayEvent(id); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "事件已重置，奖励已回退，可重新结算",
+	})
+}
+
 // getCurrentTime 获取配置时区下的当前时间
 func getCurrentTime(setting *operation_setting.SurpriseDaySetting) time.Time {
 	loc, err := time.LoadLocation(setting.Timezone)
