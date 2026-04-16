@@ -76,8 +76,9 @@ func ConcurrencyLimit() gin.HandlerFunc {
 }
 
 // resolveMaxConcurrent 解析用户的并发上限
-// 优先级：用户独立设置 > 全局默认（付费/未付费）
-// 当用户 max_concurrent == 1（默认值）时，使用全局设置的 paid_default / free_default
+// 优先级：用户独立设置（>= 1）> 全局默认（付费/未付费）
+// max_concurrent == 0 表示未独立设置，使用全局 paid_default / free_default
+// max_concurrent >= 1 表示管理员手动设定的值，直接使用
 func resolveMaxConcurrent(userId int) int {
 	setting := operation_setting.GetConcurrencySetting()
 	userCache, err := model.GetUserCache(userId)
@@ -85,12 +86,12 @@ func resolveMaxConcurrent(userId int) int {
 		return setting.FreeDefault // 查不到用户，使用未付费默认值
 	}
 
-	// 用户有独立设置（管理员手动调过，大于默认值 1）
-	if userCache.MaxConcurrent > 1 {
+	// 用户有独立设置（管理员手动设定，>= 1）
+	if userCache.MaxConcurrent >= 1 {
 		return userCache.MaxConcurrent
 	}
 
-	// 使用全局默认值：付费 vs 未付费
+	// max_concurrent == 0：使用全局默认值（付费 vs 未付费）
 	if userCache.IsPaid {
 		return setting.PaidDefault
 	}

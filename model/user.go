@@ -50,7 +50,7 @@ type User struct {
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
-	MaxConcurrent    int            `json:"max_concurrent" gorm:"type:int;default:1;column:max_concurrent"` // 用户并发上限，直接生效
+	MaxConcurrent    int            `json:"max_concurrent" gorm:"type:int;default:0;column:max_concurrent"` // 用户并发上限，0=使用全局默认，>=1=独立设置
 	IsPaid           bool           `json:"is_paid" gorm:"default:false;column:is_paid"`                    // 是否为付费用户
 }
 
@@ -64,6 +64,7 @@ func (user *User) ToBaseUser() *UserBase {
 		Setting:       user.Setting,
 		Email:         user.Email,
 		MaxConcurrent: user.MaxConcurrent,
+		IsPaid:        user.IsPaid,
 	}
 	return cache
 }

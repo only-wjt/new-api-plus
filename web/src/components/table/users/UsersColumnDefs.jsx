@@ -339,10 +339,14 @@ export const getUsersColumns = ({
       dataIndex: 'max_concurrent',
       width: 60,
       render: (text, record) => {
-        const val = record.max_concurrent || 1;
-        return (
+        const val = record.max_concurrent || 0;
+        return val >= 1 ? (
           <Tag color='blue' shape='circle' size='small'>
             {val}
+          </Tag>
+        ) : (
+          <Tag color='grey' shape='circle' size='small'>
+            {t('默认')}
           </Tag>
         );
       },
