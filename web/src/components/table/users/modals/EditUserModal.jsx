@@ -46,6 +46,7 @@ import {
   Row,
   Col,
   InputNumber,
+  Switch,
 } from '@douyinfe/semi-ui';
 import {
   IconUser,
@@ -87,6 +88,8 @@ const EditUserModal = (props) => {
     quota: 0,
     group: 'default',
     remark: '',
+    max_concurrent: 1,
+    is_paid: false,
   });
 
   const fetchGroups = async () => {
@@ -285,7 +288,7 @@ const EditUserModal = (props) => {
                           {t('权限设置')}
                         </Text>
                         <div className='text-xs text-gray-600'>
-                          {t('用户分组和额度管理')}
+                          {t('用户分组、额度与并发管理')}
                         </div>
                       </div>
                     </div>
@@ -322,6 +325,31 @@ const EditUserModal = (props) => {
                             onClick={() => setIsModalOpen(true)}
                           />
                         </Form.Slot>
+                      </Col>
+
+                      <Col span={24}>
+                        <div style={{ borderTop: '1px solid var(--semi-color-border)', margin: '4px 0 12px' }} />
+                      </Col>
+
+                      <Col span={12}>
+                        <Form.InputNumber
+                          field='max_concurrent'
+                          label={t('最大并发')}
+                          placeholder='1'
+                          min={1}
+                          max={100}
+                          style={{ width: '100%' }}
+                          extraText={t('该用户同时允许的最大请求数')}
+                        />
+                      </Col>
+
+                      <Col span={12}>
+                        <Form.Switch
+                          field='is_paid'
+                          label={t('付费用户')}
+                          checkedText='✓'
+                          uncheckedText='✗'
+                        />
                       </Col>
                     </Row>
                   </Card>

@@ -50,17 +50,20 @@ type User struct {
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	MaxConcurrent    int            `json:"max_concurrent" gorm:"type:int;default:1;column:max_concurrent"` // 用户并发上限，直接生效
+	IsPaid           bool           `json:"is_paid" gorm:"default:false;column:is_paid"`                    // 是否为付费用户
 }
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+		Id:            user.Id,
+		Group:         user.Group,
+		Quota:         user.Quota,
+		Status:        user.Status,
+		Username:      user.Username,
+		Setting:       user.Setting,
+		Email:         user.Email,
+		MaxConcurrent: user.MaxConcurrent,
 	}
 	return cache
 }
@@ -520,11 +523,13 @@ func (user *User) Edit(updatePassword bool) error {
 
 	newUser := *user
 	updates := map[string]interface{}{
-		"username":     newUser.Username,
-		"display_name": newUser.DisplayName,
-		"group":        newUser.Group,
-		"quota":        newUser.Quota,
-		"remark":       newUser.Remark,
+		"username":       newUser.Username,
+		"display_name":   newUser.DisplayName,
+		"group":          newUser.Group,
+		"quota":          newUser.Quota,
+		"remark":         newUser.Remark,
+		"max_concurrent": newUser.MaxConcurrent,
+		"is_paid":        newUser.IsPaid,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password

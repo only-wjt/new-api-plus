@@ -280,7 +280,6 @@ func migrateDB() error {
 		&SubscriptionPreConsumeRecord{},
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
-		&UserConcurrencyOverride{},
 		&SurpriseDayEvent{},
 		&SurpriseDayWinner{},
 	)
@@ -296,6 +295,10 @@ func migrateDB() error {
 			return err
 		}
 	}
+
+	// 一次性迁移：将旧 user_concurrency_overrides 表的数据迁移到 users.max_concurrent
+	migrateConcurrencyOverridesToUser()
+
 	return nil
 }
 
@@ -331,7 +334,6 @@ func migrateDBFast() error {
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
-		{&UserConcurrencyOverride{}, "UserConcurrencyOverride"},
 		{&SurpriseDayEvent{}, "SurpriseDayEvent"},
 		{&SurpriseDayWinner{}, "SurpriseDayWinner"},
 	}
