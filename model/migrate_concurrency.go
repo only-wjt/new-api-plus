@@ -9,7 +9,6 @@ import (
 // migrateConcurrencyOverridesToUser 一次性迁移：
 // 1. 将 user_concurrency_overrides 表的覆盖值迁移到 users.max_concurrent
 // 2. 将有成功充值记录的用户标记为付费（is_paid = true）
-// 3. 付费用户如果仍为默认并发数(1)，自动提升到 10
 //
 // 该函数幂等安全：多次执行不会重复修改已迁移的数据。
 // 当旧表不存在时静默跳过。
@@ -47,8 +46,8 @@ func migrateConcurrencyOverridesToUser() {
 		if row.MaxConcurrent <= 0 {
 			continue
 		}
-		// 只更新还是默认值(1)的用户，避免覆盖已手动设置的值
-		result := DB.Model(&User{}).Where("id = ? AND max_concurrent = 1", row.UserId).
+		// 只更新还是默认值(0)的用户，避免覆盖已手动设置的值
+		result := DB.Model(&User{}).Where("id = ? AND max_concurrent = 0", row.UserId).
 			Update("max_concurrent", row.MaxConcurrent)
 		if result.Error != nil {
 			common.SysError(fmt.Sprintf("迁移用户 %d 并发覆盖失败: %s", row.UserId, result.Error.Error()))
@@ -70,13 +69,6 @@ func migrateConcurrencyOverridesToUser() {
 		common.SysLog(fmt.Sprintf("标记付费用户完成，共标记 %d 个用户", paidResult.RowsAffected))
 	}
 
-	// 3. 付费用户如果并发数仍为默认值(1)，提升为 10
-	upgradeResult := DB.Model(&User{}).
-		Where("is_paid = ? AND max_concurrent = 1", true).
-		Update("max_concurrent", 10)
-	if upgradeResult.Error != nil {
-		common.SysError("提升付费用户并发数失败: " + upgradeResult.Error.Error())
-	} else if upgradeResult.RowsAffected > 0 {
-		common.SysLog(fmt.Sprintf("付费用户并发数提升完成，共提升 %d 个用户", upgradeResult.RowsAffected))
-	}
+	// 注意：不再在迁移中硬编码设置付费用户的 max_concurrent 值。
+	// 运行时由 resolveMaxConcurrent() 根据 is_paid + 全局 paid_default 动态决定。
 }

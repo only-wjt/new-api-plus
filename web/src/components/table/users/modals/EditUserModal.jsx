@@ -335,11 +335,11 @@ const EditUserModal = (props) => {
                         <Form.InputNumber
                           field='max_concurrent'
                           label={t('最大并发')}
-                          placeholder='1'
-                          min={1}
+                          placeholder='0'
+                          min={0}
                           max={100}
                           style={{ width: '100%' }}
-                          extraText={t('该用户同时允许的最大请求数')}
+                          extraText={t('0=使用全局默认，≥1=独立设置')}
                         />
                       </Col>
 
