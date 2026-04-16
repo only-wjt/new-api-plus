@@ -29,3 +29,8 @@ data/
 .gomodcache/
 .gocache-temp
 .gopath
+
+# 本地部署/文档/临时文件
+.tmp-ccload
+aidoc/
+bin/
