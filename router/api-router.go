@@ -199,9 +199,6 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			concurrencyRoute.GET("/setting", controller.GetConcurrencySetting)
 			concurrencyRoute.PUT("/setting", controller.UpdateConcurrencySetting)
-			concurrencyRoute.GET("/override", controller.GetConcurrencyOverrides)
-			concurrencyRoute.PUT("/override/:userId", controller.SetConcurrencyOverride)
-			concurrencyRoute.DELETE("/override/:userId", controller.DeleteConcurrencyOverride)
 		}
 
 		// Custom OAuth provider management (root only)

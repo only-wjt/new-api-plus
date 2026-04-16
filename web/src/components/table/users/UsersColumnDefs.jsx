@@ -98,7 +98,7 @@ const renderUsername = (text, record) => {
 const renderStatistics = (text, record, showEnableDisableModal, t) => {
   const isDeleted = record.DeletedAt !== null;
 
-  // Determine tag text & color like original status column
+  // 状态标签
   let tagColor = 'grey';
   let tagText = t('未知状态');
   if (isDeleted) {
@@ -112,12 +112,6 @@ const renderStatistics = (text, record, showEnableDisableModal, t) => {
     tagText = t('已禁用');
   }
 
-  const content = (
-    <Tag color={tagColor} shape='circle' size='small'>
-      {tagText}
-    </Tag>
-  );
-
   const tooltipContent = (
     <div className='text-xs'>
       <div>
@@ -128,7 +122,9 @@ const renderStatistics = (text, record, showEnableDisableModal, t) => {
 
   return (
     <Tooltip content={tooltipContent} position='top'>
-      {content}
+      <Tag color={tagColor} shape='circle' size='small'>
+        {tagText}
+      </Tag>
     </Tooltip>
   );
 };
@@ -336,6 +332,35 @@ export const getUsersColumns = ({
       dataIndex: 'group',
       render: (text, record, index) => {
         return <div>{renderGroup(text)}</div>;
+      },
+    },
+    {
+      title: t('并发'),
+      dataIndex: 'max_concurrent',
+      width: 60,
+      render: (text, record) => {
+        const val = record.max_concurrent || 1;
+        return (
+          <Tag color='blue' shape='circle' size='small'>
+            {val}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: t('付费'),
+      dataIndex: 'is_paid',
+      width: 60,
+      render: (text, record) => {
+        return record.is_paid ? (
+          <Tag color='green' shape='circle' size='small'>
+            {t('是')}
+          </Tag>
+        ) : (
+          <Tag color='grey' shape='circle' size='small'>
+            {t('否')}
+          </Tag>
+        );
       },
     },
     {

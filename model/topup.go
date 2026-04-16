@@ -86,7 +86,7 @@ func Recharge(referenceId string, customerId string) (err error) {
 		}
 
 		quota = topUp.Money * common.QuotaPerUnit
-		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"stripe_customer": customerId, "quota": gorm.Expr("quota + ?", quota)}).Error
+		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"stripe_customer": customerId, "quota": gorm.Expr("quota + ?", quota), "is_paid": true}).Error
 		if err != nil {
 			return err
 		}
@@ -289,7 +289,7 @@ func ManualCompleteTopUp(tradeNo string) error {
 		}
 
 		// 增加用户额度（立即写库，保持一致性）
-		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"quota": gorm.Expr("quota + ?", quotaToAdd), "is_paid": true}).Error; err != nil {
 			return err
 		}
 
@@ -359,6 +359,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			}
 		}
 
+		updateFields["is_paid"] = true
 		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(updateFields).Error
 		if err != nil {
 			return err
@@ -417,7 +418,7 @@ func RechargeWaffo(tradeNo string) (err error) {
 			return err
 		}
 
-		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"quota": gorm.Expr("quota + ?", quotaToAdd), "is_paid": true}).Error; err != nil {
 			return err
 		}
 

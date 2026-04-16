@@ -52,8 +52,8 @@ func ConcurrencyLimit() gin.HandlerFunc {
 			return
 		}
 
-		// 4. 确定该用户的并发上限
-		maxConcurrent := resolveMaxConcurrent(userId, setting)
+		// 4. 直接从用户缓存读取并发上限
+		maxConcurrent := resolveMaxConcurrent(userId)
 
 		// 5. 原子 +1 并检查是否超限
 		counter := getOrCreateCounter(userId)
@@ -75,27 +75,26 @@ func ConcurrencyLimit() gin.HandlerFunc {
 	}
 }
 
-// resolveMaxConcurrent 按优先级确定用户的并发上限：
-// 覆盖值 > 付费默认 > 免费默认
-func resolveMaxConcurrent(userId int, setting *operation_setting.ConcurrencySetting) int {
-	// 优先级 1：用户级覆盖
-	override, err := model.GetConcurrencyOverride(userId)
-	if err == nil && override != nil && override.MaxConcurrent > 0 {
-		return override.MaxConcurrent
+// resolveMaxConcurrent 解析用户的并发上限
+// 优先级：用户独立设置 > 全局默认（付费/未付费）
+// 当用户 max_concurrent == 1（默认值）时，使用全局设置的 paid_default / free_default
+func resolveMaxConcurrent(userId int) int {
+	setting := operation_setting.GetConcurrencySetting()
+	userCache, err := model.GetUserCache(userId)
+	if err != nil {
+		return setting.FreeDefault // 查不到用户，使用未付费默认值
 	}
 
-	// 优先级 2：付费/免费用户默认值
-	if model.HasSuccessfulTopUp(userId) {
-		if setting.PaidDefault > 0 {
-			return setting.PaidDefault
-		}
-		return 5 // 兜底
+	// 用户有独立设置（管理员手动调过，大于默认值 1）
+	if userCache.MaxConcurrent > 1 {
+		return userCache.MaxConcurrent
 	}
 
-	if setting.FreeDefault > 0 {
-		return setting.FreeDefault
+	// 使用全局默认值：付费 vs 未付费
+	if userCache.IsPaid {
+		return setting.PaidDefault
 	}
-	return 1 // 兜底
+	return setting.FreeDefault
 }
 
 // GetUserCurrentConcurrency 获取用户当前并发数（供管理 API 查询）
