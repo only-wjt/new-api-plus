@@ -17,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/QuantumNous/new-api/constant"
 
@@ -174,12 +175,19 @@ func Register(c *gin.Context) {
 	}
 	affCode := user.AffCode // this code is the inviter's code, not the user's own code
 	inviterId, _ := model.GetUserIdByAffCode(affCode)
+	// 获取全局并发配置，设置新用户默认并发
+	concurrencySetting := operation_setting.GetConcurrencySetting()
+	defaultConcurrent := concurrencySetting.FreeDefault
+	if defaultConcurrent <= 0 {
+		defaultConcurrent = 1
+	}
 	cleanUser := model.User{
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.Username,
-		InviterId:   inviterId,
-		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
+		Username:      user.Username,
+		Password:      user.Password,
+		DisplayName:   user.Username,
+		InviterId:     inviterId,
+		Role:          common.RoleCommonUser, // 明确设置角色为普通用户
+		MaxConcurrent: defaultConcurrent,
 	}
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
@@ -825,11 +833,17 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	// Even for admin users, we cannot fully trust them!
+	concurrencySetting := operation_setting.GetConcurrencySetting()
+	defaultConcurrent := concurrencySetting.FreeDefault
+	if defaultConcurrent <= 0 {
+		defaultConcurrent = 1
+	}
 	cleanUser := model.User{
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.DisplayName,
-		Role:        user.Role, // 保持管理员设置的角色
+		Username:      user.Username,
+		Password:      user.Password,
+		DisplayName:   user.DisplayName,
+		Role:          user.Role, // 保持管理员设置的角色
+		MaxConcurrent: defaultConcurrent,
 	}
 	if err := cleanUser.Insert(0); err != nil {
 		common.ApiError(c, err)
