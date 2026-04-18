@@ -344,7 +344,7 @@ func AdminResetSurpriseDayEvent(eventId int) error {
 	// 2. 回退已发放的奖励额度
 	for _, w := range winners {
 		if w.RefundQuota > 0 {
-			err := model.DecreaseUserQuota(w.UserId, w.RefundQuota)
+			err := model.DecreaseUserQuota(w.UserId, w.RefundQuota, true)
 			if err != nil {
 				common.SysError(fmt.Sprintf("惊喜日重置-回退额度失败 [user=%d, quota=%d]: %s", w.UserId, w.RefundQuota, err.Error()))
 			}

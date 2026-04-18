@@ -38,8 +38,12 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		}
 	}
 	other := make(map[string]interface{})
+	other["is_task"] = true
 	other["request_path"] = c.Request.URL.Path
 	other["model_price"] = info.PriceData.ModelPrice
+	if info.PriceData.ModelRatio > 0 {
+		other["model_ratio"] = info.PriceData.ModelRatio
+	}
 	other["group_ratio"] = info.PriceData.GroupRatioInfo.GroupRatio
 	if info.PriceData.GroupRatioInfo.HasSpecialRatio {
 		other["user_group_ratio"] = info.PriceData.GroupRatioInfo.GroupSpecialRatio
@@ -88,7 +92,7 @@ func taskAdjustFunding(task *model.Task, delta int) error {
 		return model.PostConsumeUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta))
 	}
 	if delta > 0 {
-		return model.DecreaseUserQuota(task.UserId, delta)
+		return model.DecreaseUserQuota(task.UserId, delta, false)
 	}
 	return model.IncreaseUserQuota(task.UserId, -delta, false)
 }
@@ -119,6 +123,9 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 	other := make(map[string]interface{})
 	if bc := task.PrivateData.BillingContext; bc != nil {
 		other["model_price"] = bc.ModelPrice
+		if bc.ModelRatio > 0 {
+			other["model_ratio"] = bc.ModelRatio
+		}
 		other["group_ratio"] = bc.GroupRatio
 		if bc.TimeDynamicMultiplier != 0 {
 			other["time_dynamic_multiplier"] = bc.TimeDynamicMultiplier
@@ -232,7 +239,6 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	}
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
-	//other["reason"] = reason
 	other["pre_consumed_quota"] = preConsumedQuota
 	other["actual_quota"] = actualQuota
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
@@ -289,9 +295,19 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 		finalGroupRatio = groupRatio
 	}
 
-	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio * tdMultiplier
-	actualQuota := int(float64(totalTokens) * modelRatio * finalGroupRatio * tdMultiplier)
+	// 计算 OtherRatios 乘积（视频折扣、时长等）
+	otherMultiplier := 1.0
+	if bc := task.PrivateData.BillingContext; bc != nil {
+		for _, r := range bc.OtherRatios {
+			if r != 1.0 && r > 0 {
+				otherMultiplier *= r
+			}
+		}
+	}
 
-	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, tdMultiplier=%.2f", totalTokens, modelRatio, finalGroupRatio, tdMultiplier)
+	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio * tdMultiplier * otherMultiplier
+	actualQuota := int(float64(totalTokens) * modelRatio * finalGroupRatio * tdMultiplier * otherMultiplier)
+
+	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, tdMultiplier=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, tdMultiplier, otherMultiplier)
 	RecalculateTaskQuota(ctx, task, actualQuota, reason)
 }

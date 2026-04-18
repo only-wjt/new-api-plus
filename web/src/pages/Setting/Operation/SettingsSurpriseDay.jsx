@@ -436,14 +436,18 @@ export default function SettingsSurpriseDay(props) {
           <Table
             dataSource={currentWinners} rowKey="id" pagination={false} size="small"
             columns={[
-              { title: '用户ID', dataIndex: 'user_id', width: 80 },
+              { title: '用户', dataIndex: 'username', width: 120, render: (_, record) => `${record.username} (${record.user_id})` },
               {
-                title: '类型', dataIndex: 'reward_type', width: 100, render: (text) => {
-                  const map = { top1: '🥇 第1名', top2: '🥈 第2名', top3: '🥉 第3名', lucky: '🎉 参与奖' };
-                  return map[text] || text;
+                title: '类型', dataIndex: 'award_type', width: 100, render: (_, record) => {
+                  if (record.award_type === 1) {
+                    const rankMap = { 1: '🥇 第1名', 2: '🥈 第2名', 3: '🥉 第3名' };
+                    return rankMap[record.rank] || `消费榜 #${record.rank}`;
+                  }
+                  if (record.award_type === 2) return '🎉 参与奖';
+                  return record.title || String(record.award_type);
                 }
               },
-              { title: '奖励额度', dataIndex: 'reward_quota', width: 100 },
+              { title: '奖励额度', dataIndex: 'refund_quota', width: 100 },
             ]}
           />
         )}
