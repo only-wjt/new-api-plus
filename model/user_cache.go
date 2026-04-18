@@ -110,6 +110,7 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		Setting:       user.Setting,
 		Email:         user.Email,
 		MaxConcurrent: user.MaxConcurrent,
+		IsPaid:        user.IsPaid,
 	}
 
 	return userCache, nil

@@ -902,6 +902,20 @@ func increaseUserQuota(id int, quota int) (err error) {
 	return err
 }
 
+// MarkUserAsPaid 将用户标记为付费用户并清除缓存
+// 在所有充值成功的路径中调用（事务提交后），确保 is_paid 和缓存同步
+func MarkUserAsPaid(userId int) {
+	err := DB.Model(&User{}).Where("id = ?", userId).Update("is_paid", true).Error
+	if err != nil {
+		common.SysError(fmt.Sprintf("标记用户 %d 为付费用户失败: %s", userId, err.Error()))
+		return
+	}
+	// 清除缓存，强制下次请求从数据库加载最新数据
+	if err := invalidateUserCache(userId); err != nil {
+		common.SysError(fmt.Sprintf("清除用户 %d 缓存失败: %s", userId, err.Error()))
+	}
+}
+
 func DecreaseUserQuota(id int, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
