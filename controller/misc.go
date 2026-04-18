@@ -24,6 +24,18 @@ type HomeMarketingConfigQuickStart struct {
 	Link        string `json:"link"`
 }
 
+// 加群引导配置
+type HomeMarketingConfigOnboarding struct {
+	Enabled     bool     `json:"enabled"`
+	Title       string   `json:"title"`
+	Subtitle    string   `json:"subtitle"`
+	QQGroupLink string   `json:"qq_group_link"`
+	Steps       []string `json:"steps"`
+	ButtonText  string   `json:"button_text"`
+	// 特色玩法说明列表
+	Features []string `json:"features"`
+}
+
 type HomeMarketingConfig struct {
 	Enabled              bool                            `json:"enabled"`
 	Announcement         string                          `json:"announcement"`
@@ -37,12 +49,14 @@ type HomeMarketingConfig struct {
 	QuickStarts          []HomeMarketingConfigQuickStart `json:"quick_starts"`
 	Scenarios            []HomeMarketingConfigQuickStart `json:"scenarios"`
 	ShowDefaultProviders bool                            `json:"show_default_providers"`
+	ShowStats            bool                            `json:"show_stats"`
 	BottomCTATitle       string                          `json:"bottom_cta_title"`
 	BottomCTASubtitle    string                          `json:"bottom_cta_subtitle"`
 	BottomPrimaryText    string                          `json:"bottom_primary_text"`
 	BottomPrimaryLink    string                          `json:"bottom_primary_link"`
 	BottomSecondaryText  string                          `json:"bottom_secondary_text"`
 	BottomSecondaryLink  string                          `json:"bottom_secondary_link"`
+	Onboarding           HomeMarketingConfigOnboarding   `json:"onboarding"`
 }
 
 func defaultHomeMarketingConfig() HomeMarketingConfig {
@@ -63,21 +77,15 @@ func defaultHomeMarketingConfig() HomeMarketingConfig {
 		QuickStarts: []HomeMarketingConfigQuickStart{
 			{
 				Title:       "我是开发者",
-				Description: "获取密钥、查看接入方式，快速完成 API 对接。",
+				Description: "获取 API 密钥，查看接入文档，快速完成对接。",
 				ButtonText:  "获取密钥",
-				Link:        "/console",
+				Link:        "/console/token",
 			},
 			{
 				Title:       "我是普通用户",
-				Description: "直接开始聊天体验，感受模型效果后再决定是否升级。",
+				Description: "直接开始对话体验，感受 AI 模型效果。",
 				ButtonText:  "开始体验",
-				Link:        "/console",
-			},
-			{
-				Title:       "我是群主",
-				Description: "结合 QQ 群机器人玩法，做签到、红包与更多互动运营。",
-				ButtonText:  "进入控制台",
-				Link:        "/console",
+				Link:        "/console/playground",
 			},
 		},
 		Scenarios: []HomeMarketingConfigQuickStart{
@@ -85,28 +93,42 @@ func defaultHomeMarketingConfig() HomeMarketingConfig {
 				Title:       "API 接入",
 				Description: "统一模型入口，减少切换不同上游时的接入成本。",
 				ButtonText:  "获取密钥",
-				Link:        "/console",
+				Link:        "/console/token",
 			},
 			{
 				Title:       "在线聊天",
-				Description: "先体验常用模型效果，再决定是否充值或长期使用。",
+				Description: "先体验常用模型效果，再决定是否充值。",
 				ButtonText:  "立即体验",
-				Link:        "/console",
-			},
-			{
-				Title:       "社群玩法",
-				Description: "支持群机器人活动与运营场景，适合做活跃和转化。",
-				ButtonText:  "进入后台",
-				Link:        "/console",
+				Link:        "/console/playground",
 			},
 		},
 		ShowDefaultProviders: true,
-		BottomCTATitle:       "先领取试用额度，再决定是否升级",
-		BottomCTASubtitle:    "把首页做成真正的转化入口，让新用户更快理解价值、开始体验并完成付费。",
-		BottomPrimaryText:    "免费开始",
-		BottomPrimaryLink:    "/register",
+		ShowStats:            true,
+		BottomCTATitle:       "加入社群，免费领取体验额度",
+		BottomCTASubtitle:    "注册账号后加入 QQ 群绑定即可获得免费额度，每日签到还能持续领取，立即开始你的 AI 体验之旅。",
+		BottomPrimaryText:    "加入 QQ 群",
+		BottomPrimaryLink:    "https://qm.qq.com/q/wT4W0Klk1U",
 		BottomSecondaryText:  "进入控制台",
 		BottomSecondaryLink:  "/console",
+		Onboarding: HomeMarketingConfigOnboarding{
+			Enabled:     true,
+			Title:       "🎁 注册即可领取免费体验额度",
+			Subtitle:    "加入我们的 QQ 群，绑定你的网站账号，即可领取免费额度开始体验",
+			QQGroupLink: "https://qm.qq.com/q/wT4W0Klk1U",
+			Steps: []string{
+				"注册网站账号",
+				"加入 QQ 群",
+				"群内发送 /绑定 你的站内ID",
+				"自动获得免费额度",
+			},
+			ButtonText: "加入 QQ 群领取",
+			Features: []string{
+				"每日签到：发送 /签到 即可领取额度",
+				"额度红包：群内不定期发放，/抢红包 参与",
+				"惊喜日：每周消费榜前三可享额度减免",
+				"余额查询：发送 /查询余额 随时掌握",
+			},
+		},
 	}
 }
 
@@ -156,6 +178,22 @@ func normalizeHomeMarketingConfig(config *HomeMarketingConfig) {
 	}
 	if config.BottomSecondaryLink == "" {
 		config.BottomSecondaryLink = defaultConfig.BottomSecondaryLink
+	}
+	// Onboarding 兜底逻辑
+	if config.Onboarding.Title == "" {
+		config.Onboarding.Title = defaultConfig.Onboarding.Title
+	}
+	if config.Onboarding.Subtitle == "" {
+		config.Onboarding.Subtitle = defaultConfig.Onboarding.Subtitle
+	}
+	if config.Onboarding.ButtonText == "" {
+		config.Onboarding.ButtonText = defaultConfig.Onboarding.ButtonText
+	}
+	if len(config.Onboarding.Steps) == 0 {
+		config.Onboarding.Steps = defaultConfig.Onboarding.Steps
+	}
+	if len(config.Onboarding.Features) == 0 {
+		config.Onboarding.Features = defaultConfig.Onboarding.Features
 	}
 }
 
@@ -259,6 +297,7 @@ func GetStatus(c *gin.Context) {
 		"uptime_kuma_enabled":   cs.UptimeKumaEnabled,
 		"announcements_enabled": cs.AnnouncementsEnabled,
 		"faq_enabled":           cs.FAQEnabled,
+		"home_stats_enabled":    cs.HomeStatsEnabled,
 
 		"HeaderNavModules":    common.OptionMap["HeaderNavModules"],
 		"SidebarModulesAdmin": common.OptionMap["SidebarModulesAdmin"],
@@ -394,4 +433,29 @@ func GetHomeMarketingConfig(c *gin.Context) {
 		"data":    getHomeMarketingConfigResponse(),
 	})
 	return
+}
+
+// GetHomeStats 返回首页展示用的统计数据（公开接口，无需鉴权）
+func GetHomeStats(c *gin.Context) {
+	var userCount int64
+	model.DB.Model(&model.User{}).Count(&userCount)
+
+	var channelCount int64
+	model.DB.Model(&model.Channel{}).Where("status = ?", common.ChannelStatusEnabled).Count(&channelCount)
+
+	// 统计已启用渠道支持的不重复模型数
+	var modelCount int64
+	model.DB.Model(&model.Ability{}).
+		Where("enabled = ?", true).
+		Distinct("model").
+		Count(&modelCount)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"user_count":    userCount,
+			"channel_count": channelCount,
+			"model_count":   modelCount,
+		},
+	})
 }

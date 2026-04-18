@@ -56,21 +56,15 @@ const DEFAULT_HOME_MARKETING_CONFIG = {
   quick_starts: [
     {
       title: '我是开发者',
-      description: '获取密钥、查看接入方式，快速完成 API 对接。',
+      description: '获取 API 密钥，查看接入文档，快速完成对接。',
       button_text: '获取密钥',
-      link: '/console',
+      link: '/console/token',
     },
     {
       title: '我是普通用户',
-      description: '直接开始聊天体验，感受模型效果后再决定是否升级。',
+      description: '直接开始对话体验，感受 AI 模型效果。',
       button_text: '开始体验',
-      link: '/console',
-    },
-    {
-      title: '我是群主',
-      description: '结合 QQ 群机器人玩法，做签到、红包与更多互动运营。',
-      button_text: '进入控制台',
-      link: '/console',
+      link: '/console/playground',
     },
   ],
   scenarios: [
@@ -78,29 +72,43 @@ const DEFAULT_HOME_MARKETING_CONFIG = {
       title: 'API 接入',
       description: '统一模型入口，减少切换不同上游时的接入成本。',
       button_text: '获取密钥',
-      link: '/console',
+      link: '/console/token',
     },
     {
       title: '在线聊天',
-      description: '先体验常用模型效果，再决定是否充值或长期使用。',
+      description: '先体验常用模型效果，再决定是否充值。',
       button_text: '立即体验',
-      link: '/console',
-    },
-    {
-      title: '社群玩法',
-      description: '支持群机器人活动与运营场景，适合做活跃和转化。',
-      button_text: '进入后台',
-      link: '/console',
+      link: '/console/playground',
     },
   ],
   show_default_providers: true,
-  bottom_cta_title: '先领取试用额度，再决定是否升级',
+  bottom_cta_title: '加入社群，免费领取体验额度',
   bottom_cta_subtitle:
-    '把首页做成真正的转化入口，让新用户更快理解价值、开始体验并完成付费。',
-  bottom_primary_text: '免费开始',
-  bottom_primary_link: '/register',
+    '注册账号后加入 QQ 群绑定即可获得免费额度，每日签到还能持续领取，立即开始你的 AI 体验之旅。',
+  bottom_primary_text: '加入 QQ 群',
+  bottom_primary_link: 'https://qm.qq.com/q/wT4W0Klk1U',
   bottom_secondary_text: '进入控制台',
   bottom_secondary_link: '/console',
+  onboarding: {
+    enabled: true,
+    title: '🎁 注册即可领取免费体验额度',
+    subtitle:
+      '加入我们的 QQ 群，绑定你的网站账号，即可领取免费额度开始体验',
+    qq_group_link: 'https://qm.qq.com/q/wT4W0Klk1U',
+    steps: [
+      '注册网站账号',
+      '加入 QQ 群',
+      '群内发送 /绑定 你的站内ID',
+      '自动获得免费额度',
+    ],
+    button_text: '加入 QQ 群领取',
+    features: [
+      '每日签到：发送 /签到 即可领取额度',
+      '额度红包：群内不定期发放，/抢红包 参与',
+      '惊喜日：每周消费榜前三可享额度减免',
+      '余额查询：发送 /查询余额 随时掌握',
+    ],
+  },
 };
 
 const createDefaultMarketingItem = () => ({
@@ -117,22 +125,51 @@ const normalizeMarketingItem = (item = {}) => ({
   link: item.link || '',
 });
 
-const normalizeMarketingConfig = (raw = {}) => ({
-  ...DEFAULT_HOME_MARKETING_CONFIG,
-  ...raw,
-  enabled: Boolean(raw.enabled),
-  benefits: Array.from({ length: 3 }, (_, index) => raw.benefits?.[index] || ''),
-  quick_starts: Array.from({ length: 3 }, (_, index) =>
-    normalizeMarketingItem(raw.quick_starts?.[index]),
-  ),
-  scenarios: Array.from({ length: 3 }, (_, index) =>
-    normalizeMarketingItem(raw.scenarios?.[index]),
-  ),
-  show_default_providers:
-    raw.show_default_providers === undefined
-      ? DEFAULT_HOME_MARKETING_CONFIG.show_default_providers
-      : Boolean(raw.show_default_providers),
-});
+const normalizeMarketingConfig = (raw = {}) => {
+  const defaultOnboarding = DEFAULT_HOME_MARKETING_CONFIG.onboarding;
+  const rawOnboarding = raw.onboarding || {};
+  return {
+    ...DEFAULT_HOME_MARKETING_CONFIG,
+    ...raw,
+    enabled: Boolean(raw.enabled),
+    benefits: Array.from(
+      { length: 3 },
+      (_, index) => raw.benefits?.[index] || '',
+    ),
+    quick_starts: Array.from({ length: 2 }, (_, index) =>
+      normalizeMarketingItem(raw.quick_starts?.[index]),
+    ),
+    scenarios: Array.from({ length: 2 }, (_, index) =>
+      normalizeMarketingItem(raw.scenarios?.[index]),
+    ),
+    show_default_providers:
+      raw.show_default_providers === undefined
+        ? DEFAULT_HOME_MARKETING_CONFIG.show_default_providers
+        : Boolean(raw.show_default_providers),
+    onboarding: {
+      ...defaultOnboarding,
+      ...rawOnboarding,
+      enabled:
+        rawOnboarding.enabled === undefined
+          ? defaultOnboarding.enabled
+          : Boolean(rawOnboarding.enabled),
+      steps: Array.from(
+        { length: 4 },
+        (_, index) =>
+          rawOnboarding.steps?.[index] ||
+          defaultOnboarding.steps?.[index] ||
+          '',
+      ),
+      features: Array.from(
+        { length: 4 },
+        (_, index) =>
+          rawOnboarding.features?.[index] ||
+          defaultOnboarding.features?.[index] ||
+          '',
+      ),
+    },
+  };
+};
 
 const serializeMarketingConfig = (config) =>
   JSON.stringify(
@@ -151,6 +188,11 @@ const serializeMarketingConfig = (config) =>
         button_text: item.button_text.trim(),
         link: item.link.trim(),
       })),
+      onboarding: {
+        ...(config.onboarding || {}),
+        steps: (config.onboarding?.steps || []).map((s) => s.trim()),
+        features: (config.onboarding?.features || []).map((f) => f.trim()),
+      },
     },
     null,
     2,
@@ -257,6 +299,29 @@ const OtherSetting = () => {
     showSuccess(t('已恢复首页营销默认模板'));
   };
 
+  // Onboarding 字段变更处理
+  const handleOnboardingFieldChange = (field, value) => {
+    setMarketingConfigValue({
+      ...homeMarketingConfig,
+      onboarding: {
+        ...homeMarketingConfig.onboarding,
+        [field]: value,
+      },
+    });
+  };
+
+  const handleOnboardingListChange = (listField, index, value) => {
+    const nextList = [...(homeMarketingConfig.onboarding?.[listField] || [])];
+    nextList[index] = value;
+    setMarketingConfigValue({
+      ...homeMarketingConfig,
+      onboarding: {
+        ...homeMarketingConfig.onboarding,
+        [listField]: nextList,
+      },
+    });
+  };
+
   const submitHomeMarketingConfig = async () => {
     try {
       setLoadingInput((loadingInput) => ({
@@ -281,7 +346,7 @@ const OtherSetting = () => {
     <Card style={{ marginTop: 16 }}>
       <Space vertical align='start' style={{ width: '100%' }} spacing='medium'>
         <Text strong>{title}</Text>
-        {[0, 1, 2].map((index) => (
+        {[0, 1].map((index) => (
           <Card key={`${field}-${index}`} bodyStyle={{ padding: 16 }}>
             <Form.Input
               label={t('标题')}
@@ -685,234 +750,6 @@ const OtherSetting = () => {
               >
                 {t('设置首页内容')}
               </Button>
-
-              <Card style={{ marginTop: 16 }}>
-                <Form.Section text={t('首页营销设置')}>
-                  <Banner
-                    fullMode={false}
-                    type='info'
-                    description={t(
-                      '启用后首页将优先展示结构化营销页，未启用时继续使用首页内容或默认首页',
-                    )}
-                    closeIcon={null}
-                    style={{ marginBottom: 16 }}
-                  />
-                  <Form.Switch
-                    field='home_marketing_enabled'
-                    label={t('启用首页营销页')}
-                    checked={homeMarketingConfig.enabled}
-                    onChange={(value) =>
-                      handleMarketingFieldChange('enabled', value)
-                    }
-                  />
-                  <Form.Switch
-                    field='home_marketing_show_default_providers'
-                    label={t('展示默认供应商 Logo 区')}
-                    checked={homeMarketingConfig.show_default_providers}
-                    onChange={(value) =>
-                      handleMarketingFieldChange('show_default_providers', value)
-                    }
-                  />
-                  <Form.Input
-                    label={t('顶部标签')}
-                    field='home_marketing_announcement'
-                    value={homeMarketingConfig.announcement}
-                    onChange={(value) =>
-                      handleMarketingFieldChange('announcement', value)
-                    }
-                    placeholder={t('在此输入顶部标签')}
-                  />
-                  <Form.Input
-                    label={t('主标题')}
-                    field='home_marketing_title'
-                    value={homeMarketingConfig.title}
-                    onChange={(value) => handleMarketingFieldChange('title', value)}
-                    placeholder={t('在此输入主标题')}
-                  />
-                  <Form.TextArea
-                    label={t('副标题')}
-                    field='home_marketing_subtitle'
-                    value={homeMarketingConfig.subtitle}
-                    onChange={(value) =>
-                      handleMarketingFieldChange('subtitle', value)
-                    }
-                    placeholder={t('在此输入副标题')}
-                    autosize={{ minRows: 3, maxRows: 6 }}
-                  />
-                  <Row gutter={12}>
-                    <Col span={12}>
-                      <Form.Input
-                        label={t('主按钮文案')}
-                        field='home_marketing_primary_button_text'
-                        value={homeMarketingConfig.primary_button_text}
-                        onChange={(value) =>
-                          handleMarketingFieldChange('primary_button_text', value)
-                        }
-                        placeholder={t('在此输入主按钮文案')}
-                      />
-                    </Col>
-                    <Col span={12}>
-                      <Form.Input
-                        label={t('主按钮链接')}
-                        field='home_marketing_primary_button_link'
-                        value={homeMarketingConfig.primary_button_link}
-                        onChange={(value) =>
-                          handleMarketingFieldChange('primary_button_link', value)
-                        }
-                        placeholder={t('在此输入主按钮链接')}
-                      />
-                    </Col>
-                  </Row>
-                  <Row gutter={12}>
-                    <Col span={12}>
-                      <Form.Input
-                        label={t('次按钮文案')}
-                        field='home_marketing_secondary_button_text'
-                        value={homeMarketingConfig.secondary_button_text}
-                        onChange={(value) =>
-                          handleMarketingFieldChange(
-                            'secondary_button_text',
-                            value,
-                          )
-                        }
-                        placeholder={t('在此输入次按钮文案')}
-                      />
-                    </Col>
-                    <Col span={12}>
-                      <Form.Input
-                        label={t('次按钮链接')}
-                        field='home_marketing_secondary_button_link'
-                        value={homeMarketingConfig.secondary_button_link}
-                        onChange={(value) =>
-                          handleMarketingFieldChange(
-                            'secondary_button_link',
-                            value,
-                          )
-                        }
-                        placeholder={t('在此输入次按钮链接')}
-                      />
-                    </Col>
-                  </Row>
-                  <Card style={{ marginTop: 16 }}>
-                    <Space vertical align='start' style={{ width: '100%' }}>
-                      <Text strong>{t('首屏优势文案')}</Text>
-                      {[0, 1, 2].map((index) => (
-                        <Form.Input
-                          key={`benefit-${index}`}
-                          label={`${t('优势文案')} ${index + 1}`}
-                          field={`home_marketing_benefit_${index}`}
-                          value={homeMarketingConfig.benefits[index] || ''}
-                          onChange={(value) =>
-                            handleMarketingBenefitChange(index, value)
-                          }
-                          placeholder={t('在此输入优势文案')}
-                        />
-                      ))}
-                    </Space>
-                  </Card>
-                  {renderMarketingEditor(t('快速引导卡片'), 'quick_starts')}
-                  {renderMarketingEditor(t('场景卡片'), 'scenarios')}
-                  <Card style={{ marginTop: 16 }}>
-                    <Space vertical align='start' style={{ width: '100%' }}>
-                      <Text strong>{t('底部转化区')}</Text>
-                      <Form.Input
-                        label={t('底部标题')}
-                        field='home_marketing_bottom_cta_title'
-                        value={homeMarketingConfig.bottom_cta_title}
-                        onChange={(value) =>
-                          handleMarketingFieldChange('bottom_cta_title', value)
-                        }
-                        placeholder={t('在此输入底部标题')}
-                      />
-                      <Form.TextArea
-                        label={t('底部副标题')}
-                        field='home_marketing_bottom_cta_subtitle'
-                        value={homeMarketingConfig.bottom_cta_subtitle}
-                        onChange={(value) =>
-                          handleMarketingFieldChange(
-                            'bottom_cta_subtitle',
-                            value,
-                          )
-                        }
-                        placeholder={t('在此输入底部副标题')}
-                        autosize={{ minRows: 3, maxRows: 6 }}
-                      />
-                      <Row gutter={12}>
-                        <Col span={12}>
-                          <Form.Input
-                            label={t('底部主按钮文案')}
-                            field='home_marketing_bottom_primary_text'
-                            value={homeMarketingConfig.bottom_primary_text}
-                            onChange={(value) =>
-                              handleMarketingFieldChange(
-                                'bottom_primary_text',
-                                value,
-                              )
-                            }
-                            placeholder={t('在此输入底部主按钮文案')}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Form.Input
-                            label={t('底部主按钮链接')}
-                            field='home_marketing_bottom_primary_link'
-                            value={homeMarketingConfig.bottom_primary_link}
-                            onChange={(value) =>
-                              handleMarketingFieldChange(
-                                'bottom_primary_link',
-                                value,
-                              )
-                            }
-                            placeholder={t('在此输入底部主按钮链接')}
-                          />
-                        </Col>
-                      </Row>
-                      <Row gutter={12}>
-                        <Col span={12}>
-                          <Form.Input
-                            label={t('底部次按钮文案')}
-                            field='home_marketing_bottom_secondary_text'
-                            value={homeMarketingConfig.bottom_secondary_text}
-                            onChange={(value) =>
-                              handleMarketingFieldChange(
-                                'bottom_secondary_text',
-                                value,
-                              )
-                            }
-                            placeholder={t('在此输入底部次按钮文案')}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Form.Input
-                            label={t('底部次按钮链接')}
-                            field='home_marketing_bottom_secondary_link'
-                            value={homeMarketingConfig.bottom_secondary_link}
-                            onChange={(value) =>
-                              handleMarketingFieldChange(
-                                'bottom_secondary_link',
-                                value,
-                              )
-                            }
-                            placeholder={t('在此输入底部次按钮链接')}
-                          />
-                        </Col>
-                      </Row>
-                    </Space>
-                  </Card>
-                  <Space style={{ marginTop: 16 }}>
-                    <Button onClick={resetMarketingConfig}>
-                      {t('恢复默认模板')}
-                    </Button>
-                    <Button
-                      type='primary'
-                      onClick={submitHomeMarketingConfig}
-                      loading={loadingInput['HomeMarketingConfig'] || loading}
-                    >
-                      {t('保存首页营销设置')}
-                    </Button>
-                  </Space>
-                </Form.Section>
-              </Card>
 
               <Form.TextArea
                 label={t('关于')}

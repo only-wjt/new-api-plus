@@ -11,6 +11,7 @@ type ConsoleSetting struct {
 	UptimeKumaEnabled    bool   `json:"uptime_kuma_enabled"`   // 是否启用 Uptime Kuma 面板
 	AnnouncementsEnabled bool   `json:"announcements_enabled"` // 是否启用系统公告面板
 	FAQEnabled           bool   `json:"faq_enabled"`           // 是否启用常见问答面板
+	HomeStatsEnabled     bool   `json:"home_stats_enabled"`    // 是否在首页显示统计数据看板
 }
 
 // 默认配置
@@ -23,6 +24,7 @@ var defaultConsoleSetting = ConsoleSetting{
 	UptimeKumaEnabled:    true,
 	AnnouncementsEnabled: true,
 	FAQEnabled:           true,
+	HomeStatsEnabled:     true,
 }
 
 // 全局实例

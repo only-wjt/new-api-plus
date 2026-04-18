@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Card, Spin, Button, Modal } from '@douyinfe/semi-ui';
+import { Card, Spin, Button, Modal, Switch, Typography } from '@douyinfe/semi-ui';
 import { API, showError, showSuccess, toBoolean } from '../../helpers';
 import SettingsAPIInfo from '../../pages/Setting/Dashboard/SettingsAPIInfo';
 import SettingsAnnouncements from '../../pages/Setting/Dashboard/SettingsAnnouncements';
@@ -36,6 +36,7 @@ const DashboardSetting = () => {
     'console_setting.announcements_enabled': '',
     'console_setting.faq_enabled': '',
     'console_setting.uptime_kuma_enabled': '',
+    'console_setting.home_stats_enabled': '',
 
     // 用于迁移检测的旧键，下个版本会删除
     ApiInfo: '',
@@ -140,6 +141,35 @@ const DashboardSetting = () => {
             迁移过程中会自动处理数据格式转换，迁移完成后旧配置将被清除，请在迁移前在数据库中备份好旧配置。
           </p>
         </Modal>
+
+        {/* 首页统计看板开关 */}
+        <Card style={{ marginTop: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <Typography.Title heading={6} style={{ margin: 0 }}>首页统计数据看板</Typography.Title>
+              <Typography.Text type='tertiary' size='small'>控制首页是否展示用户数、模型数、渠道数等统计数据</Typography.Text>
+            </div>
+            <Switch
+              checked={inputs['console_setting.home_stats_enabled'] === 'true' || inputs['console_setting.home_stats_enabled'] === true || inputs['console_setting.home_stats_enabled'] === ''}
+              onChange={async (checked) => {
+                try {
+                  const res = await API.put('/api/option/', {
+                    key: 'console_setting.home_stats_enabled',
+                    value: String(checked),
+                  });
+                  if (res.data.success) {
+                    showSuccess('设置已保存');
+                    await onRefresh();
+                  } else {
+                    showError(res.data.message);
+                  }
+                } catch (err) {
+                  showError('保存失败');
+                }
+              }}
+            />
+          </div>
+        </Card>
 
         {/* 数据看板设置 */}
         <Card style={{ marginTop: '10px' }}>
