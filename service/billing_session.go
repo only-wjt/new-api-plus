@@ -151,8 +151,18 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 
 	// ---- 信任额度旁路 ----
 	if s.shouldTrust(c) {
-		effectiveQuota = 0
-		logger.LogInfo(c, fmt.Sprintf("用户 %d 额度充足, 信任且不需要预扣费 (funding=%s)", s.relayInfo.UserId, s.funding.Source()))
+		if sub, ok := s.funding.(*SubscriptionFunding); ok {
+			// 订阅信任：使用最小预扣（1 quota）而非全额预估
+			// 1) 确保 PreConsumeUserSubscription 能创建预扣记录
+			// 2) 滑动窗口记录初始值为 1，结算时由 UpdateSlidingWindowRecord 修正为实际金额
+			sub.amount = 1
+			effectiveQuota = 1
+			logger.LogInfo(c, fmt.Sprintf("用户 %d 订阅信任旁路, 最小预扣 1 quota (原预估=%s)",
+				s.relayInfo.UserId, logger.FormatQuota(quota)))
+		} else {
+			effectiveQuota = 0
+			logger.LogInfo(c, fmt.Sprintf("用户 %d 额度充足, 信任且不需要预扣费 (funding=%s)", s.relayInfo.UserId, s.funding.Source()))
+		}
 	} else if effectiveQuota > 0 {
 		logger.LogInfo(c, fmt.Sprintf("用户 %d 需要预扣费 %s (funding=%s)", s.relayInfo.UserId, logger.FormatQuota(effectiveQuota), s.funding.Source()))
 	}
@@ -224,11 +234,10 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 	case BillingSourceWallet:
 		return s.relayInfo.UserQuota > trustQuota
 	case BillingSourceSubscription:
-		// 订阅不能启用信任旁路。原因：
-		// 1. PreConsumeUserSubscription 要求 amount>0 来创建预扣记录并锁定订阅
-		// 2. SubscriptionFunding.PreConsume 忽略参数，始终用 s.amount 预扣
-		// 3. 若信任旁路将 effectiveQuota 设为 0，会导致 preConsumedQuota 与实际订阅预扣不一致
-		return false
+		// 订阅信任旁路：preConsume 中会将 effectiveQuota 和 sub.amount 都设为 1（最小预扣），
+		// 确保 PreConsumeUserSubscription 能正常创建预扣记录。
+		// 结算时通过 Settle(delta) 按实际消耗修正订阅额度和 Redis 滑动窗口。
+		return true
 	default:
 		return false
 	}

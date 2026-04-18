@@ -117,6 +117,46 @@ func AddSlidingWindowRecord(userSubscriptionId int, requestId string, amount int
 	return nil
 }
 
+// UpdateSlidingWindowRecord 更新指定 requestId 的滑动窗口记录金额。
+// 结算时调用：用实际消耗金额替换预估金额，保留原始时间戳。
+// 最佳尽力，失败只记日志。
+func UpdateSlidingWindowRecord(userSubscriptionId int, requestId string, oldAmount int64, newAmount int64) {
+	if !common.RedisEnabled || common.RDB == nil {
+		return
+	}
+	if oldAmount == newAmount {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	key := slidingWindowKey(userSubscriptionId)
+	oldMember := slidingWindowMember(requestId, oldAmount)
+
+	// 获取旧记录的时间戳（score）
+	score, err := common.RDB.ZScore(ctx, key, oldMember).Result()
+	if err != nil {
+		// 旧记录不存在（可能已过期），跳过
+		return
+	}
+
+	// 删除旧记录
+	common.RDB.ZRem(ctx, key, oldMember)
+
+	// 如果实际金额 > 0，添加新记录（保持原时间戳）
+	if newAmount > 0 {
+		newMember := slidingWindowMember(requestId, newAmount)
+		if err := common.RDB.ZAdd(ctx, key, &redis.Z{
+			Score:  score,
+			Member: newMember,
+		}).Err(); err != nil {
+			common.SysError(fmt.Sprintf("滑动窗口结算更新失败 (subId=%d, reqId=%s, %d->%d): %s",
+				userSubscriptionId, requestId, oldAmount, newAmount, err.Error()))
+		}
+	}
+}
+
 // RemoveSlidingWindowRecord 移除指定 requestId 的滑动窗口记录（退款时调用）。
 // 由于 member 格式为 "{requestId}:{amount}"，amount 未知，需遍历匹配。
 // 应在退款事务成功后调用（最佳尽力，失败只记日志）。

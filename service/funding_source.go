@@ -105,16 +105,27 @@ func (s *SubscriptionFunding) Settle(delta int) error {
 	if delta == 0 {
 		return nil
 	}
-	return model.PostConsumeUserSubscriptionDelta(s.subscriptionId, int64(delta))
+	if err := model.PostConsumeUserSubscriptionDelta(s.subscriptionId, int64(delta)); err != nil {
+		return err
+	}
+	// 同步更新 Redis 滑动窗口：用实际消耗金额替换预估金额
+	actualAmount := s.preConsumed + int64(delta)
+	model.UpdateSlidingWindowRecord(s.subscriptionId, s.requestId, s.preConsumed, actualAmount)
+	return nil
 }
 
 func (s *SubscriptionFunding) Refund() error {
 	if s.preConsumed <= 0 {
 		return nil
 	}
-	return refundWithRetry(func() error {
+	err := refundWithRetry(func() error {
 		return model.RefundSubscriptionPreConsume(s.requestId)
 	})
+	if err == nil {
+		// 退款成功，同步删除 Redis 滑动窗口记录
+		model.RemoveSlidingWindowRecord(s.subscriptionId, s.requestId)
+	}
+	return err
 }
 
 // refundWithRetry 尝试多次执行退款操作以提高成功率，只能用于基于事务的退款函数！！！！！！
