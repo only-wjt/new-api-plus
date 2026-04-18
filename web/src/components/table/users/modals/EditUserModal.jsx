@@ -425,7 +425,7 @@ const EditUserModal = (props) => {
                           label={t('最大并发')}
                           placeholder='0'
                           min={0}
-                          max={100}
+                          max={1000}
                           style={{ width: '100%' }}
                           extraText={t('0=使用全局默认，≥1=独立设置')}
                         />
