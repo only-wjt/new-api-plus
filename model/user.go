@@ -527,7 +527,6 @@ func (user *User) Edit(updatePassword bool) error {
 		"username":       newUser.Username,
 		"display_name":   newUser.DisplayName,
 		"group":          newUser.Group,
-		"quota":          newUser.Quota,
 		"remark":         newUser.Remark,
 		"max_concurrent": newUser.MaxConcurrent,
 		"is_paid":        newUser.IsPaid,
@@ -604,13 +603,19 @@ func (user *User) ValidateAndFill() (err error) {
 	password := user.Password
 	username := strings.TrimSpace(user.Username)
 	if username == "" || password == "" {
-		return errors.New("用户名或密码为空")
+		return ErrUserEmptyCredentials
 	}
-	// find buy username or email
-	DB.Where("username = ? OR email = ?", username, username).First(user)
+	// find by username or email
+	err = DB.Where("username = ? OR email = ?", username, username).First(user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrInvalidCredentials
+		}
+		return fmt.Errorf("%w: %v", ErrDatabase, err)
+	}
 	okay := common.ValidatePasswordAndHash(password, user.Password)
 	if !okay || user.Status != common.UserStatusEnabled {
-		return errors.New("用户名或密码错误，或用户已被封禁")
+		return ErrInvalidCredentials
 	}
 	return nil
 }
@@ -761,16 +766,20 @@ func IsAdmin(userId int) bool {
 //	return user.Status == common.UserStatusEnabled, nil
 //}
 
-func ValidateAccessToken(token string) (user *User) {
+func ValidateAccessToken(token string) (*User, error) {
 	if token == "" {
-		return nil
+		return nil, nil
 	}
 	token = strings.Replace(token, "Bearer ", "", 1)
-	user = &User{}
-	if DB.Where("access_token = ?", token).First(user).RowsAffected == 1 {
-		return user
+	user := &User{}
+	err := DB.Where("access_token = ?", token).First(user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
-	return nil
+	return user, nil
 }
 
 // GetUserQuota gets quota from Redis first, falls back to DB if needed
@@ -916,7 +925,7 @@ func MarkUserAsPaid(userId int) {
 	}
 }
 
-func DecreaseUserQuota(id int, quota int) (err error) {
+func DecreaseUserQuota(id int, quota int, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
@@ -926,7 +935,7 @@ func DecreaseUserQuota(id int, quota int) (err error) {
 			common.SysLog("failed to decrease user quota: " + err.Error())
 		}
 	})
-	if common.BatchUpdateEnabled {
+	if !db && common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUserQuota, id, -quota)
 		return nil
 	}
@@ -948,7 +957,7 @@ func DeltaUpdateUserQuota(id int, delta int) (err error) {
 	if delta > 0 {
 		return IncreaseUserQuota(id, delta, false)
 	} else {
-		return DecreaseUserQuota(id, -delta)
+		return DecreaseUserQuota(id, -delta, false)
 	}
 }
 

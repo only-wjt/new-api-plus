@@ -217,7 +217,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 	}
 
 	// 预扣费：原子减少用户额度，防止并发超额消费
-	if err := model.DecreaseUserQuota(info.UserId, priceData.Quota); err != nil {
+	if err := model.DecreaseUserQuota(info.UserId, priceData.Quota, true); err != nil {
 		return &dto.MidjourneyResponse{
 			Code:        4,
 			Description: fmt.Sprintf("pre_consume_quota_failed: %s", err.Error()),
@@ -545,7 +545,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 	// 预扣费：原子减少用户额度，防止并发超额消费
 	preConsumed := false
 	if consumeQuota {
-		if err := model.DecreaseUserQuota(relayInfo.UserId, priceData.Quota); err != nil {
+		if err := model.DecreaseUserQuota(relayInfo.UserId, priceData.Quota, true); err != nil {
 			return &dto.MidjourneyResponse{
 				Code:        4,
 				Description: fmt.Sprintf("pre_consume_quota_failed: %s", err.Error()),

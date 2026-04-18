@@ -24,6 +24,7 @@ import App from '../../App';
 import FooterBar from './Footer';
 import MaintenanceBanner from './MaintenanceBanner';
 import { ToastContainer } from 'react-toastify';
+import ErrorBoundary from '../common/ErrorBoundary';
 import React, { useContext, useEffect, useState } from 'react';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { useSidebarCollapsed } from '../../hooks/common/useSidebarCollapsed';
@@ -218,7 +219,9 @@ const PageLayout = () => {
               position: 'relative',
             }}
           >
-            <App />
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
           </Content>
           {!shouldHideFooter && (
             <Layout.Footer

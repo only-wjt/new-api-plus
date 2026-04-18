@@ -34,3 +34,4 @@ data/
 .tmp-ccload
 aidoc/
 bin/
+token_estimator_test.go
