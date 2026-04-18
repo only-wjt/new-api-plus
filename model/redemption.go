@@ -140,7 +140,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
 		}
-		err = tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
+		err = tx.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{"quota": gorm.Expr("quota + ?", redemption.Quota), "is_paid": true}).Error
 		if err != nil {
 			return err
 		}
@@ -154,6 +154,8 @@ func Redeem(key string, userId int) (quota int, err error) {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
+	// 刷新用户缓存，使 is_paid 立即生效
+	MarkUserAsPaid(userId)
 	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
 	return redemption.Quota, nil
 }

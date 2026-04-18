@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/pkg/cachex"
 	"github.com/samber/hot"
 	"gorm.io/gorm"
@@ -581,6 +582,8 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string) error {
 		_ = UpdateUserGroupCache(logUserId, upgradeGroup)
 	}
 	if logUserId > 0 {
+		// 订阅购买也标记为付费用户
+		MarkUserAsPaid(logUserId)
 		msg := fmt.Sprintf("订阅购买成功，套餐: %s，支付金额: %.2f，支付方式: %s", logPlanTitle, logMoney, logPaymentMethod)
 		RecordLog(logUserId, LogTypeTopup, msg)
 	}
@@ -659,6 +662,8 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 	if err != nil {
 		return "", err
 	}
+	// 管理员绑定订阅也标记为付费用户
+	MarkUserAsPaid(userId)
 	if strings.TrimSpace(plan.UpgradeGroup) != "" {
 		_ = UpdateUserGroupCache(userId, plan.UpgradeGroup)
 		return fmt.Sprintf("用户分组将升级到 %s", plan.UpgradeGroup), nil
@@ -1002,8 +1007,8 @@ func checkMultiLevelLimits(sub *UserSubscription, plan *SubscriptionPlan, amount
 	if plan.DailyLimit > 0 {
 		if sub.DailyUsed+amount > plan.DailyLimit {
 			return &SubscriptionRateLimitError{
-				Message: fmt.Sprintf("今日订阅额度已用尽（已用 %d / 上限 %d），将于明日 00:00 重置。如需继续使用，请切换计费偏好为「仅用钱包」。",
-					sub.DailyUsed, plan.DailyLimit),
+				Message: fmt.Sprintf("今日订阅额度已用完（已用 %s / 每日上限 %s），明日 00:00 自动恢复。如需立即使用，可在设置中切换为「仅用钱包」计费。",
+					logger.LogQuota(int(sub.DailyUsed)), logger.LogQuota(int(plan.DailyLimit))),
 			}
 		}
 	}
@@ -1012,8 +1017,8 @@ func checkMultiLevelLimits(sub *UserSubscription, plan *SubscriptionPlan, amount
 	if plan.WeeklyLimit > 0 {
 		if sub.WeeklyUsed+amount > plan.WeeklyLimit {
 			return &SubscriptionRateLimitError{
-				Message: fmt.Sprintf("本周订阅额度已用尽（已用 %d / 上限 %d），将于下周一 00:00 重置。如需继续使用，请切换计费偏好为「仅用钱包」。",
-					sub.WeeklyUsed, plan.WeeklyLimit),
+				Message: fmt.Sprintf("本周订阅额度已用完（已用 %s / 每周上限 %s），下周一 00:00 自动恢复。如需立即使用，可在设置中切换为「仅用钱包」计费。",
+					logger.LogQuota(int(sub.WeeklyUsed)), logger.LogQuota(int(plan.WeeklyLimit))),
 			}
 		}
 	}
@@ -1023,8 +1028,8 @@ func checkMultiLevelLimits(sub *UserSubscription, plan *SubscriptionPlan, amount
 		windowUsed, _ := GetSlidingWindowUsage(sub.Id, plan.SlidingWindowHours)
 		if windowUsed+amount > plan.SlidingWindowLimit {
 			return &SubscriptionRateLimitError{
-				Message: fmt.Sprintf("%d 小时滑动窗口额度已用尽（已用 %d / 上限 %d），额度将随时间推移自动释放。如需继续使用，请切换计费偏好为「仅用钱包」。",
-					plan.SlidingWindowHours, windowUsed, plan.SlidingWindowLimit),
+				Message: fmt.Sprintf("近 %d 小时内订阅用量已达上限（已用 %s / 上限 %s），额度会随时间自动恢复。如需立即使用，可在设置中切换为「仅用钱包」计费。",
+					plan.SlidingWindowHours, logger.LogQuota(int(windowUsed)), logger.LogQuota(int(plan.SlidingWindowLimit))),
 			}
 		}
 	}
