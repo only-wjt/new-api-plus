@@ -76,9 +76,9 @@ func ConcurrencyLimit() gin.HandlerFunc {
 }
 
 // resolveMaxConcurrent 解析用户的并发上限
-// 优先级：用户独立设置（>= 1）> 全局默认（付费/未付费）
-// max_concurrent == 0 表示未独立设置，使用全局 paid_default / free_default
-// max_concurrent >= 1 表示管理员手动设定的值，直接使用
+// 逻辑：
+//   - 免费用户：若 max_concurrent >= 1 则使用该值，否则使用 free_default
+//   - 付费用户：取 max(max_concurrent, paid_default)，保证付费用户不低于 paid_default
 func resolveMaxConcurrent(userId int) int {
 	setting := operation_setting.GetConcurrencySetting()
 	userCache, err := model.GetUserCache(userId)
@@ -86,14 +86,17 @@ func resolveMaxConcurrent(userId int) int {
 		return setting.FreeDefault // 查不到用户，使用未付费默认值
 	}
 
-	// 用户有独立设置（管理员手动设定，>= 1）
-	if userCache.MaxConcurrent >= 1 {
-		return userCache.MaxConcurrent
+	if userCache.IsPaid {
+		// 付费用户：保底 paid_default，手动设值只有超过时才生效
+		if userCache.MaxConcurrent > setting.PaidDefault {
+			return userCache.MaxConcurrent
+		}
+		return setting.PaidDefault
 	}
 
-	// max_concurrent == 0：使用全局默认值（付费 vs 未付费）
-	if userCache.IsPaid {
-		return setting.PaidDefault
+	// 免费用户：有独立设置则使用，否则走全局默认
+	if userCache.MaxConcurrent >= 1 {
+		return userCache.MaxConcurrent
 	}
 	return setting.FreeDefault
 }
@@ -104,4 +107,9 @@ func GetUserCurrentConcurrency(userId int) int32 {
 		return counter.(*atomic.Int32).Load()
 	}
 	return 0
+}
+
+// ResolveEffectiveConcurrency 供外部（controller）调用，返回用户的实际有效并发数
+func ResolveEffectiveConcurrency(userId int) int {
+	return resolveMaxConcurrent(userId)
 }

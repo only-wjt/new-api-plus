@@ -32,7 +32,7 @@ import {
   renderQuota,
   stringToColor,
 } from '../../../../helpers';
-import { Coins, BarChart2, Users } from 'lucide-react';
+import { Coins, BarChart2, Users, Zap } from 'lucide-react';
 
 const UserInfoHeader = ({ t, userState }) => {
   const getUsername = () => {
@@ -154,6 +154,16 @@ const UserInfoHeader = ({ t, userState }) => {
               </div>
               <Divider layout='vertical' />
               <div className='flex items-center gap-2'>
+                <Zap size={16} />
+                <Typography.Text size='small' type='tertiary'>
+                  {t('最大并发')}
+                </Typography.Text>
+                <Typography.Text size='small' type='tertiary' strong>
+                  {userState?.user?.effective_concurrency || '-'}
+                </Typography.Text>
+              </div>
+              <Divider layout='vertical' />
+              <div className='flex items-center gap-2'>
                 <Users size={16} />
                 <Typography.Text size='small' type='tertiary'>
                   {t('用户分组')}
@@ -196,6 +206,18 @@ const UserInfoHeader = ({ t, userState }) => {
               </div>
               <Typography.Text size='small' type='tertiary' strong>
                 {userState.user?.request_count || 0}
+              </Typography.Text>
+            </div>
+            <Divider margin='8px' />
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <Zap size={16} />
+                <Typography.Text size='small' type='tertiary'>
+                  {t('最大并发')}
+                </Typography.Text>
+              </div>
+              <Typography.Text size='small' type='tertiary' strong>
+                {userState?.user?.effective_concurrency || '-'}
               </Typography.Text>
             </div>
             <Divider margin='8px' />

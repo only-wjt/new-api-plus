@@ -18,6 +18,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/middleware"
 
 	"github.com/QuantumNous/new-api/constant"
 
@@ -425,8 +426,11 @@ func GetSelf(c *gin.Context) {
 		"linux_do_id":       user.LinuxDOId,
 		"setting":           user.Setting,
 		"stripe_customer":   user.StripeCustomer,
-		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
-		"permissions":       permissions,                // 新增权限字段
+		"sidebar_modules":       userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"permissions":           permissions,                // 新增权限字段
+		"max_concurrent":        user.MaxConcurrent,
+		"is_paid":               user.IsPaid,
+		"effective_concurrency": middleware.ResolveEffectiveConcurrency(user.Id),
 	}
 
 	c.JSON(http.StatusOK, gin.H{
